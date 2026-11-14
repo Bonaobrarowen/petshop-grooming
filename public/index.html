@@ -32,18 +32,20 @@
   </style>
 </head>
 <body><div id="root"></div>
+<script src="api-client.js"></script>
 <script>
 let token=localStorage.getItem('tok'),user=JSON.parse(localStorage.getItem('me')||'null'),main=null,current=null,cart=[];
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 async function api(path,method='GET',body){
-  const response=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:body===undefined?undefined:JSON.stringify(body)});
-  const data=await response.json().catch(()=>({}));
-  if(response.status==401){logout();throw new Error('Please log in again')}
-  if(!response.ok)throw new Error(data.error||'Request failed');
-  return data;
+  try{
+    return await window.petshopApi(path,method,body,token);
+  }catch(err){
+    if(err.message==='Please log in again'||err.message==='Please sign in'){logout();}
+    throw err;
+  }
 }
-if(user&&user.role=='Customer'){location.href='/customer-dashboard.html';}
+if(user&&user.role=='Customer'){location.href='customer-dashboard.html';}
 function logout(){localStorage.removeItem('tok');localStorage.removeItem('me');token=null;user=null;start()}
 function formatCell(column,value){
   if(column==='status'){
@@ -257,10 +259,10 @@ function start(){
   if(!token){
     let signup=false;
     const render=()=>{
-      $('#root').innerHTML=`<div class="auth-shell"><div class="login-card"><h1>Pet Shop Grooming</h1><h2>${signup?'Customer registration':'Login'}</h2><form id="auth">${signup?'<label>Full name<input name="fullName" required></label><label>Mobile number<input name="phone" required pattern="09[0-9]{9}" maxlength="11"></label><label>Email (optional)<input name="email" type="email"></label><label>Address (optional)<input name="address"></label>':''}<label>Username<input name="username" required minlength="3"></label><label>Password<input name="password" type="password" required minlength="${signup?6:1}"></label>${signup?' <label>Confirm password<input name="confirm" type="password" required minlength="6"></label>':''}<button>${signup?'Create customer account':'Login'}</button><div id="auth-feedback"></div></form><div class="switch">${signup?'Already have an account?':'New here?'} <a id="switch">${signup?'Login':'Create an account'}</a></div></div></div>`;
+      $('#root').innerHTML=`<div class="auth-shell"><div class="login-card"><h1>Pet Shop Grooming</h1><h2>${signup?'Customer registration':'Login'}</h2><form id="auth">${signup?'<label>Full name<input name="fullName" required></label><label>Mobile number<input name="phone" required pattern="09[0-9]{9}" maxlength="11"></label><label>Email (optional)<input name="email" type="email"></label><label>Address (optional)<input name="address"></label>':''}<label>Username<input name="username" required minlength="3"></label><label>Password<input name="password" type="password" required minlength="${signup?6:1}"></label>${signup?' <label>Confirm password<input name="confirm" type="password" required minlength="6"></label>':''}<button>${signup?'Create customer account':'Login'}</button><div id="auth-feedback"></div></form><div class="switch">${signup?'Already have an account?':'New here?'} <a id="switch">${signup?'Login':'Create an account'}</a></div><div class="switch" style="margin-top:10px;font-size:13px"><a href="book.html">📅 Book Appointment Online</a> &bull; <a href="customer-dashboard.html">👤 Customer Portal</a></div></div></div>`;
       $('#switch').onclick=()=>{signup=!signup;render()};
       $('#auth').onsubmit=async event=>{event.preventDefault();const form=new FormData(event.target);if(signup&&form.get('password')!=form.get('confirm')){$('#auth-feedback').innerHTML='<div class="alert error">Passwords do not match</div>';return}
-        try{const data=await api(signup?'/auth/signup':'/auth/login','POST',signup?{fullName:form.get('fullName'),phone:form.get('phone'),email:form.get('email'),address:form.get('address'),username:form.get('username'),password:form.get('password')}:{username:form.get('username'),password:form.get('password')});token=data.token;user=data.user;localStorage.setItem('tok',token);localStorage.setItem('me',JSON.stringify(user));if(user.role=='Customer'){location.href='/customer-dashboard.html';return}start()}catch(error){$('#auth-feedback').innerHTML=`<div class="alert error">${esc(error.message)}</div>`}
+        try{const data=await api(signup?'/auth/signup':'/auth/login','POST',signup?{fullName:form.get('fullName'),phone:form.get('phone'),email:form.get('email'),address:form.get('address'),username:form.get('username'),password:form.get('password')}:{username:form.get('username'),password:form.get('password')});token=data.token;user=data.user;localStorage.setItem('tok',token);localStorage.setItem('me',JSON.stringify(user));if(user.role=='Customer'){location.href='customer-dashboard.html';return}start()}catch(error){$('#auth-feedback').innerHTML=`<div class="alert error">${esc(error.message)}</div>`}
       };
     };render();return;
   }
