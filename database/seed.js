@@ -9,17 +9,10 @@ const seed = db.transaction(() => {
     DELETE FROM grooming_appointment;
     DELETE FROM authorized_pet_pickup;
     DELETE FROM pet;
+    DELETE FROM user_account;
     DELETE FROM customer;
     DELETE FROM product_inventory;
   `);
-
-  const insertUser = db.prepare(`
-    INSERT OR REPLACE INTO user_account (user_id, username, password_hash, full_name, role, status)
-    VALUES (?, ?, ?, ?, ?, 'Active')
-  `);
-  insertUser.run(1, 'admin', bcrypt.hashSync('admin123', 10), 'System Administrator', 'Administrator');
-  insertUser.run(2, 'staff_anna', bcrypt.hashSync('staff123', 10), 'Anna Reyes', 'Staff');
-  insertUser.run(3, 'staff_mark', bcrypt.hashSync('staff123', 10), 'Mark Santos', 'Staff');
 
   const insertCustomer = db.prepare(`
     INSERT OR REPLACE INTO customer (customer_id, customer_identity, full_name, phone, email, address)
@@ -38,6 +31,16 @@ const seed = db.transaction(() => {
     ['CUST-0010', 'Kate Rivera', '09181234507', 'kate.rivera@gmail.com', '91 Oak St, Las Pinas']
   ];
   additionalCustomers.forEach((customer, index) => insertCustomer.run(index + 4, ...customer));
+
+  const insertUser = db.prepare(`
+    INSERT OR REPLACE INTO user_account (user_id, username, password_hash, full_name, role, customer_id, status)
+    VALUES (?, ?, ?, ?, ?, ?, 'Active')
+  `);
+  insertUser.run(1, 'admin', bcrypt.hashSync('admin123', 10), 'System Administrator', 'Administrator', null);
+  insertUser.run(2, 'staff_anna', bcrypt.hashSync('staff123', 10), 'Anna Reyes', 'Staff', null);
+  insertUser.run(3, 'staff_mark', bcrypt.hashSync('staff123', 10), 'Mark Santos', 'Staff', null);
+  insertUser.run(4, 'juan', bcrypt.hashSync('customer123', 10), 'Juan Dela Cruz', 'Customer', 1);
+  insertUser.run(5, 'maria', bcrypt.hashSync('customer123', 10), 'Maria Clara', 'Customer', 2);
 
   const insertPet = db.prepare(`
     INSERT INTO pet (pet_id, customer_id, name, species, breed, age)
@@ -69,10 +72,10 @@ const seed = db.transaction(() => {
       (appointment_id, pet_id, service, appointment_date, price, status)
     VALUES (?, ?, ?, ?, ?, 'Scheduled')
   `);
-  insertAppointment.run(1, 1, 'Full Grooming Package', '2026-11-06 10:00', 850);
-  insertAppointment.run(2, 3, 'Basic Shower & Blow Dry', '2026-11-06 11:30', 450);
-  insertAppointment.run(3, 2, 'Anti-Flea & Tick Treatment', '2026-11-06 14:00', 350);
-  insertAppointment.run(4, 4, 'Nail Trimming & Filing', '2026-11-06 15:30', 150);
+  insertAppointment.run(1, 1, 'Full Grooming Package', '2026-11-20 10:00', 850);
+  insertAppointment.run(2, 3, 'Basic Shower & Blow Dry', '2026-11-20 11:30', 450);
+  insertAppointment.run(3, 2, 'Anti-Flea & Tick Treatment', '2026-11-20 14:00', 350);
+  insertAppointment.run(4, 4, 'Nail Trimming & Filing', '2026-11-20 15:30', 150);
 
   const insertPickup = db.prepare(`
     INSERT INTO authorized_pet_pickup
@@ -117,14 +120,4 @@ const seed = db.transaction(() => {
 
 seed();
 
-console.log('Sample data loaded successfully.');
-console.log(JSON.stringify({
-  users: db.prepare('SELECT COUNT(*) AS count FROM user_account').get().count,
-  customers: db.prepare('SELECT COUNT(*) AS count FROM customer').get().count,
-  pets: db.prepare('SELECT COUNT(*) AS count FROM pet').get().count,
-  products: db.prepare('SELECT COUNT(*) AS count FROM product_inventory').get().count,
-  appointments: db.prepare('SELECT COUNT(*) AS count FROM grooming_appointment').get().count,
-  pickups: db.prepare('SELECT COUNT(*) AS count FROM authorized_pet_pickup').get().count,
-  sales: db.prepare('SELECT COUNT(*) AS count FROM sales').get().count,
-  customers_with_sales: db.prepare('SELECT COUNT(DISTINCT customer_id) AS count FROM sales').get().count
-}));
+console.log('Sample data loaded successfully with customer accounts.');
