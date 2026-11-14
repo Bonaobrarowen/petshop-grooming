@@ -41,5 +41,6 @@ exports.lowStock = (q, s) => s.json(db.prepare('SELECT * FROM product_inventory 
 exports.dashboard = (q, s) => s.json(db.prepare(`SELECT
   (SELECT COUNT(*) FROM customer) AS customers, (SELECT COUNT(*) FROM pet) AS pets,
   (SELECT COUNT(*) FROM grooming_appointment WHERE status='Scheduled' AND date(appointment_date)=date('now','localtime')) AS appointments_today,
+  (SELECT COUNT(*) FROM grooming_appointment WHERE status='Pending') AS pending_appointments,
   (SELECT COUNT(*) FROM product_inventory WHERE stock_quantity <= reorder_level) AS low_stock,
   (SELECT COALESCE(SUM(total_amount),0) FROM sales WHERE date(sale_date)=date('now','localtime')) AS sales_today`).get());

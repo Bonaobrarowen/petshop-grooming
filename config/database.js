@@ -42,6 +42,7 @@ if (!customerColumns.some(c => c.name === 'customer_identity')) {
 if (!db.prepare("PRAGMA table_info(product_inventory)").all().some(c => c.name === 'barcode')) {
   db.exec('ALTER TABLE product_inventory ADD COLUMN barcode TEXT');
 }
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS product_name_unique ON product_inventory(lower(trim(name)))');
 const pickupColumns = db.prepare("PRAGMA table_info(authorized_pet_pickup)").all();
 if (!pickupColumns.some(c => c.name === 'authorization_status')) {
   db.exec("ALTER TABLE authorized_pet_pickup ADD COLUMN authorization_status TEXT NOT NULL DEFAULT 'Pending'");
