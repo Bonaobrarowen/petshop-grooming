@@ -104,13 +104,6 @@ function renderAuth(isSignup=false){
       <div class="switch" style="margin-top:8px">
         <a href="index.html" style="color:var(--muted);font-weight:normal">&larr; Staff / Admin Login</a>
       </div>
-      ${!isSignup?`
-        <div class="hint-box">
-          <strong>Default Customer Account:</strong><br>
-          &bull; Username: <code>juan</code><br>
-          &bull; Password: <code>customer123</code>
-        </div>
-      `:''}
     </div>
   `;
 
@@ -301,3 +294,4 @@ if(token&&user&&user.role==='Customer'){
 </script>
 </body>
 </html>
+
