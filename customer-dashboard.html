@@ -3,13 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>My Pet Appointments</title>
+  <title>My Pet Appointments - Pet Shop Grooming</title>
+  <meta name="description" content="View your pet grooming appointments and book new grooming schedules online.">
   <style>
-    :root{--accent:#14606e;--border:#dce3e8;--text:#18212b;--muted:#66717d}*{box-sizing:border-box}body{margin:0;background:#eef4f5;color:var(--text);font:15px/1.5 system-ui,sans-serif}header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:white;border-bottom:1px solid var(--border)}header b{font-size:18px}button{border:0;border-radius:6px;background:var(--accent);color:white;padding:9px 14px;font:inherit;cursor:pointer}.wrap{max-width:1000px;margin:auto;padding:24px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.card{background:white;border:1px solid var(--border);border-radius:10px;padding:20px}form{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:flex;flex-direction:column;color:var(--muted);font-size:13px}input,select{padding:9px;border:1px solid var(--border);border-radius:6px;font:inherit;width:100%}.full{grid-column:1/-1}.table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}th{color:var(--muted)}.empty,.message{color:var(--muted)}.error{color:#b3261e}.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:bold}.badge-pending{background:#fff3cd;color:#856404;border:1px solid #ffeeba}.badge-scheduled{background:#d4edda;color:#155724;border:1px solid #c3e6cb}@media(max-width:700px){header{padding:12px}.grid{grid-template-columns:1fr}form{grid-template-columns:1fr}.full{grid-column:auto}}
+    :root{--accent:#14606e;--border:#dce3e8;--text:#18212b;--muted:#66717d}*{box-sizing:border-box}body{margin:0;background:#eef4f5;color:var(--text);font:15px/1.5 system-ui,sans-serif}header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:white;border-bottom:1px solid var(--border)}header b{font-size:18px}header a{color:var(--muted);text-decoration:none;margin-right:12px;font-size:14px}header a:hover{color:var(--accent)}button{border:0;border-radius:6px;background:var(--accent);color:white;padding:9px 14px;font:inherit;cursor:pointer}.wrap{max-width:1000px;margin:auto;padding:24px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.card{background:white;border:1px solid var(--border);border-radius:10px;padding:20px}form{display:grid;grid-template-columns:1fr 1fr;gap:12px}label{display:flex;flex-direction:column;color:var(--muted);font-size:13px}input,select{padding:9px;border:1px solid var(--border);border-radius:6px;font:inherit;width:100%}.full{grid-column:1/-1}.table-scroll{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{padding:9px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}th{color:var(--muted)}.empty,.message{color:var(--muted)}.error{color:#b3261e}.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:bold}.badge-pending{background:#fff3cd;color:#856404;border:1px solid #ffeeba}.badge-scheduled{background:#d4edda;color:#155724;border:1px solid #c3e6cb}@media(max-width:700px){header{padding:12px}.grid{grid-template-columns:1fr}form{grid-template-columns:1fr}.full{grid-column:auto}}
   </style>
 </head>
 <body>
-<header><b>Pet Shop Grooming</b><button id="logout">Sign out</button></header>
+<header>
+  <b>Pet Shop Grooming</b>
+  <div>
+    <a href="book.html">Public booking</a>
+    <a href="index.html">Staff / Admin portal</a>
+    <button id="logout">Sign out</button>
+  </div>
+</header>
 <main class="wrap">
   <h1>My Pet Appointments</h1>
   <div class="grid">
@@ -35,11 +43,21 @@
     </section>
   </div>
 </main>
+<script src="api-client.js"></script>
 <script>
 const token=localStorage.getItem('tok'),user=JSON.parse(localStorage.getItem('me')||'null');
 const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-if(!token||!user||user.role!='Customer'){location.href='/';}
-async function api(path,method='GET',body){const response=await fetch('/api'+path,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:body===undefined?undefined:JSON.stringify(body)});const data=await response.json().catch(()=>({}));if(response.status==401){localStorage.removeItem('tok');localStorage.removeItem('me');location.href='/'}if(!response.ok)throw new Error(data.error||'Request failed');return data}
+if(!token||!user||user.role!='Customer'){location.href='index.html';}
+async function api(path,method='GET',body){
+  try{
+    return await window.petshopApi(path,method,body,token);
+  }catch(err){
+    if(err.message==='Please log in'||err.message==='Please sign in'){
+      localStorage.removeItem('tok');localStorage.removeItem('me');location.href='index.html';
+    }
+    throw err;
+  }
+}
 function renderBadge(status){
   if(status==='Pending')return '<span class="badge badge-pending">Pending registration</span>';
   if(status==='Scheduled')return '<span class="badge badge-scheduled">Registered</span>';
@@ -64,7 +82,7 @@ document.querySelector('#booking').onsubmit=async e=>{
     message.textContent=error.message;
   }
 };
-document.querySelector('#logout').onclick=()=>{localStorage.removeItem('tok');localStorage.removeItem('me');location.href='/'};
+document.querySelector('#logout').onclick=()=>{localStorage.removeItem('tok');localStorage.removeItem('me');location.href='index.html'};
 load().catch(error=>document.querySelector('#appointments').innerHTML=`<p class="error">${esc(error.message)}</p>`);
 </script>
 </body>
