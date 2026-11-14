@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book a Grooming Appointment - Pet Shop Grooming</title>
+  <meta name="description" content="Book a grooming appointment for your dog online. Choose from full grooming, shower, nail trimming, and specialty pet care services.">
+  <meta name="keywords" content="book pet grooming, dog grooming appointment, pet schedule booking, pet salon">
+  <meta name="robots" content="index, follow">
+  <meta property="og:title" content="Book a Grooming Appointment - Pet Shop Grooming">
+  <meta property="og:description" content="Easily schedule and appoint grooming services for your pets online.">
+  <meta property="og:type" content="website">
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#eef4f5;font-family:system-ui,sans-serif;color:#18212b;display:grid;place-items:center;padding:24px}
+    main{width:min(620px,100%);background:white;border-radius:12px;padding:28px;box-shadow:0 12px 40px #1b3a4420}
+    h1{text-align:center;margin-top:0}.notice{text-align:center;color:#66717d;margin-bottom:22px}
+    .top-links{text-align:center;margin-bottom:14px;font-size:13px}
+    .top-links a{color:#14606e;text-decoration:none;margin:0 6px}
+    .top-links a:hover{text-decoration:underline}
+    form{display:grid;grid-template-columns:1fr 1fr;gap:14px}label{display:flex;flex-direction:column;color:#66717d;font-size:13px}
+    input,select{margin-top:5px;padding:10px;border:1px solid #dce3e8;border-radius:7px;font:inherit;width:100%}.full{grid-column:1/-1}
+    button{grid-column:1/-1;padding:11px;border:0;border-radius:7px;background:#14606e;color:white;font-size:16px;font-weight:bold;cursor:pointer}
+    #message{grid-column:1/-1;text-align:center;color:#246b34}.error{color:#b3261e!important}@media(max-width:600px){form{grid-template-columns:1fr}.full{grid-column:auto}button{grid-column:auto}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="top-links">
+    <a href="index.html">&larr; Staff / Admin Login</a> &bull;
+    <a href="customer-dashboard.html">Customer Portal</a>
+  </div>
+  <h1>Pet Shop Grooming</h1>
+  <p class="notice">Book a grooming appointment for your dog online.</p>
+  <form id="booking">
+    <label class="full">Full name<input name="full_name" autocomplete="name" required></label>
+    <label>Mobile number<input name="phone" placeholder="09XXXXXXXXX" pattern="09[0-9]{9}" maxlength="11" required></label>
+    <label>Email (optional)<input name="email" type="email"></label>
+    <label>Dog name<input name="pet_name" required></label>
+    <label>Breed<input name="breed" required></label>
+    <label>Dog age<input name="age" type="number" min="0" step="1" required></label>
+    <label>Service<select name="service" required><option value="">Select service</option><option>Full Grooming Package</option><option>Basic Shower &amp; Blow Dry</option><option>Nail Trimming &amp; Filing</option><option>Ear Cleaning &amp; Plucking</option><option>Anti-Flea &amp; Tick Treatment</option><option>De-Shedding &amp; De-Matting</option><option>Teeth Brushing &amp; Breath Care</option><option>Puppy / Kitten First Bath</option></select></label>
+    <label class="full">Preferred date and time<input name="appointment_date" type="datetime-local" required></label>
+    <label class="full">Address (optional)<input name="address"></label>
+    <button>Submit appointment request</button>
+    <p id="message"></p>
+  </form>
+</main>
+<script src="api-client.js"></script>
+<script>
+const form=document.querySelector('#booking'),message=document.querySelector('#message'),date=form.elements.appointment_date;
+const minimum=new Date(Date.now()+30*60*1000);minimum.setSeconds(0,0);date.min=new Date(minimum-minimum.getTimezoneOffset()*60000).toISOString().slice(0,16);
+form.onsubmit=async event=>{
+  event.preventDefault();message.className='';message.textContent='Submitting...';
+  try{
+    const body=Object.fromEntries(new FormData(form));
+    const data=await window.petshopApi('/public/appointments','POST',body);
+    message.textContent=data.message;form.reset();
+  }catch(error){message.className='error';message.textContent=error.message}
+};
+</script>
+</body>
+</html>
