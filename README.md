@@ -68,6 +68,16 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
 
 The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new empty database is initialized with sample records. Open the site through the server URL above; opening an HTML file directly or deploying only to GitHub Pages does not provide the shared backend, including OTP email. Customer account registration and appointment requests are rejected in static-only mode rather than being saved only in one browser. Use the same running backend URL for the customer and staff/admin portals so all requests reach the shared database.
 
+## Deploy the live app with Render
+
+The source code stays in this GitHub repository. The root `render.yaml` deploys the Node.js app from the repository and serves both the website and API from one Render URL. A persistent disk stores SQLite data, backups, and logs between restarts.
+
+1. In Render, choose **New → Blueprint**, connect `Bonaobrarowen/petshop-grooming`, and deploy the `main` branch.
+2. Review the plan before confirming: Render persistent disks require a paid web service and may incur charges.
+3. Use the generated Render URL for both staff/admin and customer access. GitHub Pages remains a static preview; it cannot save shared registrations or appointments.
+4. The Render database starts without sample customers or appointments. It creates the default `admin` account; change its password, then create staff accounts and inventory.
+5. To enable OTP password recovery, configure the SMTP variables from `.env.example` in the Render service's **Environment** settings.
+
 ---
 
 ## Default Login Credentials

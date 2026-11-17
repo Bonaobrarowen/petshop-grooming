@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: petshop-grooming
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /
+    disk:
+      name: petshop-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /var/data/petshop.db
+      - key: BACKUP_DIR
+        value: /var/data/backups
+      - key: LOGS_DIR
+        value: /var/data/logs
+      - key: LOW_STOCK_DEFAULT
+        value: "5"
+      - key: SEED_SAMPLE_DATA
+        value: "false"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: OTP_SECRET
+        generateValue: true
