@@ -52,6 +52,10 @@ const pickupColumns = db.prepare("PRAGMA table_info(authorized_pet_pickup)").all
 if (!pickupColumns.some(c => c.name === 'authorization_status')) {
   db.exec("ALTER TABLE authorized_pet_pickup ADD COLUMN authorization_status TEXT NOT NULL DEFAULT 'Pending'");
 }
+if (!db.prepare('PRAGMA table_info(authorized_pet_pickup)').all().some(c => c.name === 'appointment_id')) {
+  db.exec('ALTER TABLE authorized_pet_pickup ADD COLUMN appointment_id INTEGER REFERENCES grooming_appointment(appointment_id) ON DELETE SET NULL');
+}
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS pickup_appointment_unique ON authorized_pet_pickup(appointment_id) WHERE appointment_id IS NOT NULL');
 if (!db.prepare("PRAGMA table_info(payment)").all().some(c => c.name === 'reference_number')) {
   db.exec('ALTER TABLE payment ADD COLUMN reference_number TEXT');
 }

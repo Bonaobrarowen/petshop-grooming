@@ -215,12 +215,40 @@
       const id = Number(cleanPath.split('/')[2]);
       const appt = db.appointments.find(a => a.appointment_id === id);
       if (!appt) throw new Error('Appointment not found');
+      if (appt.status !== 'Pending') throw new Error('Only pending appointment requests can be registered');
       appt.status = 'Scheduled';
       const pet = db.pets.find(p => p.pet_id === appt.pet_id);
       const cust = db.customers.find(c => c.customer_id === pet?.customer_id);
       addLog(db, `Appointment #${id} for ${pet?.name || 'Pet'} (${cust?.full_name || 'Customer'}) registered into schedule by ${currentUser?.name || 'Staff'}`);
       saveDb(db);
       return { ok: true, appointment_id: id, message: `Appointment #${id} for ${pet?.name || 'Pet'} successfully registered in grooming schedule.` };
+    }
+    if (/^\/appointments\/\d+\/complete$/.test(cleanPath) && method === 'POST') {
+      const id = Number(cleanPath.split('/')[2]);
+      const appt = db.appointments.find(a => a.appointment_id === id);
+      if (!appt) throw new Error('Appointment not found');
+      if (appt.status !== 'Scheduled' && appt.status !== 'Done') throw new Error('Only scheduled appointments can be marked done');
+      const pet = db.pets.find(p => p.pet_id === appt.pet_id);
+      const cust = db.customers.find(c => c.customer_id === pet?.customer_id);
+      let pickup = db.pickups.find(p => p.appointment_id === id);
+      if (!pickup) {
+        pickup = {
+          pickup_id: Math.max(0, ...db.pickups.map(p => p.pickup_id)) + 1,
+          appointment_id: id,
+          pet_id: appt.pet_id,
+          person_name: cust?.full_name || 'Pet owner',
+          relationship: 'Owner',
+          contact: cust?.phone || '',
+          id_presented: 0,
+          authorization_status: 'Pending',
+          released_at: null
+        };
+        db.pickups.push(pickup);
+      }
+      appt.status = 'Done';
+      addLog(db, `Appointment #${id} for ${pet?.name || 'Pet'} marked done; added to pet pickup verification`);
+      saveDb(db);
+      return { ok: true, appointment_id: id, pickup_id: pickup.pickup_id, message: `${pet?.name || 'Pet'} is ready for pickup verification.` };
     }
 
     // Appointments list / CRUD
@@ -454,16 +482,28 @@
 
     // Pickups
     if (cleanPath === '/pickups') return [...db.pickups].reverse();
+    if (/^\/pickups\/\d+\/verify$/.test(cleanPath) && method === 'POST') {
+      const id = Number(cleanPath.split('/')[2]);
+      const pick = db.pickups.find(p => p.pickup_id === id);
+      if (!pick) throw new Error('Pickup record not found');
+      if (pick.released_at) throw new Error('This pet was already released');
+      if (pick.authorization_status === 'Rejected') throw new Error('Rejected pickup authorization cannot be verified');
+      pick.id_presented = 1;
+      pick.authorization_status = 'Verified';
+      addLog(db, `ID checked for pickup #${id} (${pick.person_name}) by ${currentUser?.name || 'Staff'}`);
+      saveDb(db);
+      return pick;
+    }
     if (/^\/pickups\/\d+\/release$/.test(cleanPath) && method === 'POST') {
       const id = Number(cleanPath.split('/')[2]);
       const pick = db.pickups.find(p => p.pickup_id === id);
-      if (pick) {
-        pick.authorization_status = 'Verified';
-        pick.released_at = new Date().toISOString().replace('T', ' ').slice(0, 19);
-        addLog(db, `Pet pickup #${id} released by ${currentUser?.name || 'Staff'}`);
-        saveDb(db);
-      }
-      return { ok: true };
+      if (!pick) throw new Error('Pickup record not found');
+      if (pick.released_at) throw new Error('This pet was already released');
+      if (!pick.id_presented || pick.authorization_status !== 'Verified') throw new Error('Verify the authorized person and their ID before release');
+      pick.released_at = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      addLog(db, `Pet pickup #${id} released by ${currentUser?.name || 'Staff'}`);
+      saveDb(db);
+      return pick;
     }
 
     // Backups & Logs

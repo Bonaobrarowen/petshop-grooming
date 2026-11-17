@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS payment (
 );
 CREATE TABLE IF NOT EXISTS authorized_pet_pickup (
   pickup_id INTEGER PRIMARY KEY AUTOINCREMENT,
+  appointment_id INTEGER UNIQUE REFERENCES grooming_appointment(appointment_id) ON DELETE SET NULL,
   pet_id INTEGER NOT NULL REFERENCES pet(pet_id) ON DELETE CASCADE,
   person_name TEXT NOT NULL, relationship TEXT, contact TEXT,
   id_presented INTEGER NOT NULL DEFAULT 0,

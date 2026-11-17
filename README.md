@@ -91,6 +91,7 @@ These are sample credentials. Change them before using a deployed system. The se
 - **Only Administrators** can delete customers. Deleting a customer also deletes their pets and grooming appointments, keeps sales history without its customer link, and deactivates any linked customer login. The confirmation dialog explains this before proceeding.
 - **Customers** can register an account with an email address, book grooming appointments, and view their appointment status in the customer portal.
 - New staff/admin accounts require a unique username and recovery email, a role, and a password of at least 8 characters. Existing accounts' recovery emails can be changed in **System users**.
+- The **System users** page shows separate sections for Staff, Administrator, and Customer accounts.
 
 ### Forgot password / OTP
 
@@ -112,23 +113,29 @@ OTP codes expire after 10 minutes, can only be used once, and allow up to five v
   - The status immediately updates from `Pending` to `Scheduled`, updates the live dashboard counters, and displays as **Registered** on the customer's dashboard in real time.
 - **Audit Logging**: Every appointment request and 1-push registration is automatically timestamped and appended to the system audit trail.
 
-### 2. Duplicate Item Name Prevention
+### 2. Grooming Completion & Pet Pickup
+- A staff member can select **Done** on a scheduled grooming appointment when the service is complete.
+- The appointment is removed from the active Grooming schedules list and a pending pickup-verification record is created for the pet, prefilled with the owner's name and phone number.
+- The system opens **Pet pickup verification**. Staff check the authorized person's ID with **Verify ID**, then select **Release pet** after verification.
+- The completed appointment remains visible in the customer's appointment history as **Done - ready for pickup**.
+
+### 3. Duplicate Item Name Prevention
 - **Unique Item Names**: When entering a product in **Inventory Management**, the system checks if an item with the same name already exists (case-insensitive, e.g., *"Dog Food"* vs *"dog food"*).
 - **Client & Server Validation**:
   - Frontend checks existing inventory and blocks duplicate submission with an instant alert.
   - Server API validates incoming names on both creation and modification, returning a clear error: `An item named "..." already exists. Duplicate item names cannot be input.`
   - SQLite database includes a unique index (`product_name_unique`) on `LOWER(TRIM(name))` ensuring strict database integrity.
 
-### 3. Inventory stock additions
+### 4. Inventory stock additions
 - Existing products have a **Qty to add** field and **Add stock** button in the inventory list.
 - Added stock is summed with the current quantity; it does not replace existing stock. Only positive whole-number quantities are accepted.
 
-### 4. Account and customer management
+### 5. Account and customer management
 - Administrators can create Staff and Administrator accounts and set or update their recovery emails from **System users**.
 - Customer deletion uses the customer's database ID and is restricted to administrators. The confirmation describes related records affected by deletion.
 - The login page supports email-based OTP password recovery when SMTP is configured.
 
-### 5. Scrollable Database Backup & Recovery Audit Trail
+### 6. Scrollable Database Backup & Recovery Audit Trail
 - System and error trails are available to administrators, with a refresh control.
 - Backup files and long log entries are displayed in scrollable containers to keep the page usable.
 - **Trail Switcher & Refresh**: Admins can switch between **System trail** and **Error trail** using a dropdown and refresh the trail on demand.
@@ -172,6 +179,7 @@ OTP codes expire after 10 minutes, can only be used once, and allow up to five v
 
 ### Grooming Appointments
 - Supports walk-in bookings and customer online booking.
+- Scheduled appointments can be marked **Done**; they move from the active schedule to **Pet pickup verification**.
 - Standard grooming packages:
   - Full Grooming Package (PHP 850.00)
   - Basic Shower & Blow Dry (PHP 450.00)
@@ -183,7 +191,9 @@ OTP codes expire after 10 minutes, can only be used once, and allow up to five v
   - Teeth Brushing & Breath Care (PHP 120.00)
 
 ### Authorized Pet Pickup
-- Pickup authorization tracking with verified representative, relationship, contact, ID presentation, and staff verification before release.
+- Completed grooming appointments create pending pickup records, prefilled with the owner's contact details.
+- Staff record ID verification using **Verify ID** before **Release pet** becomes available.
+- Tracks the authorized person, relationship, contact, ID presentation, verification, and release.
 
 ### Database Backup & Recovery
 - Stored under `database/backups/`.

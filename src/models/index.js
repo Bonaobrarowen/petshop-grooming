@@ -19,5 +19,5 @@ module.exports = {
   Product: make('product_inventory', 'product_id', ['name', 'category', 'price', 'stock_quantity', 'reorder_level', 'barcode']),
   Appointment: make('grooming_appointment', 'appointment_id', ['pet_id', 'service', 'appointment_date', 'price', 'status']),
   Payment: make('payment', 'payment_id', ['sale_id', 'appointment_id', 'amount', 'method', 'account_name', 'reference_number', 'status']),
-  Pickup: make('authorized_pet_pickup', 'pickup_id', ['pet_id', 'person_name', 'relationship', 'contact', 'id_presented', 'authorization_status', 'released_at', 'verified_by'])
+  Pickup: make('authorized_pet_pickup', 'pickup_id', ['appointment_id', 'pet_id', 'person_name', 'relationship', 'contact', 'id_presented', 'authorization_status', 'released_at', 'verified_by'])
 };

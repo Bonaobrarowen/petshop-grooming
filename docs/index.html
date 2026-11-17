@@ -64,8 +64,8 @@ const definitions={
   pets:{title:'Pet history',columns:['pet_id','pet_code','name','species','breed','age','owner_customer_id','owner_name','owner_phone'],fields:[['customer_id','Customer ID / Owner'],['name','Pet name'],['species','Species'],['breed','Breed'],['age','Age','number']]},
   products:{title:'Inventory Management',columns:['product_id','name','category','price','stock_quantity','reorder_level','barcode'],fields:[['name','Product name'],['category','Category','select',['Food','Grooming','Accessories','Treats','Health & Care','Toys','Cleaning & Hygiene','Pet Supplies']],['price','Price','number'],['stock_quantity','Stock','number'],['reorder_level','Reorder level','number'],['barcode','Barcode']]},
   appointments:{title:'Grooming schedules',columns:['appointment_id','pet_id','pet_name','owner_customer_id','owner_name','owner_phone','service','appointment_date','price','status'],fields:[['pet_id','Pet'],['service','Service'],['appointment_date','Date and time','datetime-local'],['price','Price','number']]},
-  pickups:{title:'Pet pickup',columns:['pickup_id','pet_id','person_name','relationship','contact','id_presented','authorization_status','released_at'],fields:[['pet_id','Pet ID','number'],['person_name','Authorized person'],['relationship','Relationship'],['contact','Contact number'],['id_presented','ID presented?','number'],['authorization_status','Verification status']]},
-  users:{title:'Users',columns:['user_id','username','full_name','role','status'],fields:[['username','Username'],['full_name','Full name'],['email','Recovery email','email'],['password','Password (8+ characters)','password'],['role','Role','select',['Staff','Administrator']],['status','Status','select',['Active','Inactive']]]}
+  pickups:{title:'Pet pickup verification',columns:['pickup_id','pet_id','person_name','relationship','contact','id_presented','authorization_status','released_at','appointment_id'],fields:[['pet_id','Pet ID','number'],['person_name','Authorized person'],['relationship','Relationship'],['contact','Contact number'],['id_presented','ID presented?','number'],['authorization_status','Verification status']]},
+  users:{title:'System users',columns:['user_id','username','full_name','role','status'],fields:[['username','Username'],['full_name','Full name'],['email','Recovery email','email'],['password','Password (8+ characters)','password'],['role','Role','select',['Staff','Administrator']],['status','Status','select',['Active','Inactive']]]}
 };
 async function dashboard(){
   clearInterval(window.dashboardClock);const d=await api('/dashboard');
@@ -135,11 +135,13 @@ async function pos(){
 }
 function actions(key,item){
   const id=typeof item==='object'&&item!==null?(key=='customers'?item.customer_id:item.appointment_id||item.pickup_id||item[definitions[key]?.columns[0]]):item;
-  const status=typeof item==='object'&&item!==null?item.status:'';
+  const status=typeof item==='object'&&item!==null?(key=='pickups'?item.authorization_status:item.status):'';
   let html='';
-  if(key=='pickups')html+=`<button class="small" data-action="release" data-id="${id}">Release pet</button> `;
+  if(key=='pickups'&&!item.released_at&&status!=='Rejected'&&(!item.id_presented||status!=='Verified'))html+=`<button class="small register" data-action="verify-pickup" data-id="${id}">Verify ID</button> `;
+  if(key=='pickups'&&!item.released_at&&item.id_presented&&status==='Verified')html+=`<button class="small" data-action="release" data-id="${id}">Release pet</button> `;
   if(key=='appointments'){
     if(status==='Pending')html+=`<button class="small register" data-action="register-appointment" data-id="${id}" title="Register this schedule into the system in 1 push">Register</button> `;
+    if(status==='Scheduled')html+=`<button class="small register" data-action="complete-appointment" data-id="${id}">Done</button> `;
   }
   if(key=='users')html+=`<label>Recovery email<input type="email" value="${esc(item.email||'')}" data-user-email="${id}" required></label><button class="small" data-save-user-email="${id}">Save email</button> `;
   if(user.role=='Administrator')html+=`<button class="small delete" data-delete="${id}">Delete</button>`;
@@ -153,7 +155,8 @@ async function section(key){
     rows=rows.filter(c=>dogOwnerIds.has(String(c.customer_id)));
   }
   if(key=='pickups'){
-    main.innerHTML=`<h2>${definition.title}</h2><div class="row"><label>Fast Pet Lookup (Enter Pet ID)<input id="pickup-search" type="number" min="1" placeholder="Type Pet ID"></label><button id="pickup-search-button">Search Pet</button></div><div id="pickup-result"></div>`+table(rows,definition.columns,r=>actions(key,r));
+    const notice=window.pickupNotice||'';window.pickupNotice='';
+    main.innerHTML=`<h2>${definition.title}</h2><div id="feedback">${notice?`<div class="alert success">${esc(notice)}</div>`:''}</div><div class="row"><label>Fast Pet Lookup (Enter Pet ID)<input id="pickup-search" type="number" min="1" placeholder="Type Pet ID"></label><button id="pickup-search-button">Search Pet</button></div><div id="pickup-result"></div>`+table(rows,definition.columns,r=>actions(key,r));
     $('#pickup-search-button').onclick=()=>{
       const petId=$('#pickup-search').value.trim();
       main.querySelectorAll('tbody tr').forEach(row=>row.style.display=!petId||row.cells[1].textContent.trim()==petId?'':'none');
@@ -163,7 +166,8 @@ async function section(key){
   if(key=='appointments'){
     const pets=(await api('/pets')).filter(p=>String(p.species).toLowerCase()==='dog');
     const customers=await api('/customers'),owners=customers.filter(c=>pets.some(p=>String(p.customer_id)==String(c.customer_id)));
-    const pending=rows.filter(r=>r.status==='Pending');
+    const activeRows=rows.filter(r=>r.status!=='Done');
+    const pending=activeRows.filter(r=>r.status==='Pending');
     let pendingBanner='';
     if(pending.length>0){
       pendingBanner=`
@@ -195,7 +199,7 @@ async function section(key){
         </div>
       `;
     }
-    main.innerHTML=`<h2>${definition.title}</h2><div id="feedback"></div>${pendingBanner}<form id="record-form"><label>Dog owner name<input id="owner" name="owner_name" placeholder="Enter customer name" autocomplete="off" required></label><label>Pet<select name="pet_id" required><option value="">Select dog</option></select></label><label>Species<input id="pet-species" value="Dog"></label><label>Breed<input id="pet-breed"></label><label>Age<input id="pet-age" type="number" min="0" step="1"></label><label>Service<select name="service">${Object.keys(servicePrices).map(s=>`<option>${esc(s)}</option>`).join('')}</select></label><label>Date and time<input name="appointment_date" type="datetime-local" required></label><label>Price<input name="price" type="number" min="120" step="0.01" required></label><button>Add grooming</button></form>`+table(rows,definition.columns,r=>actions(key,r));
+    main.innerHTML=`<h2>${definition.title}</h2><div id="feedback"></div>${pendingBanner}<form id="record-form"><label>Dog owner name<input id="owner" name="owner_name" placeholder="Enter customer name" autocomplete="off" required></label><label>Pet<select name="pet_id" required><option value="">Select dog</option></select></label><label>Species<input id="pet-species" value="Dog"></label><label>Breed<input id="pet-breed"></label><label>Age<input id="pet-age" type="number" min="0" step="1"></label><label>Service<select name="service">${Object.keys(servicePrices).map(s=>`<option>${esc(s)}</option>`).join('')}</select></label><label>Date and time<input name="appointment_date" type="datetime-local" required></label><label>Price<input name="price" type="number" min="120" step="0.01" required></label><button>Add grooming</button></form>`+table(activeRows,definition.columns,r=>actions(key,r));
     const owner=$('#owner'),pet=$('[name=pet_id]');
     const details=()=>{const p=pets.find(x=>String(x.pet_id)==pet.value);$('#pet-species').value=p?.species||'';$('#pet-breed').value=p?.breed||'';$('#pet-age').value=p?.age??''};
     owner.oninput=()=>{const customer=owners.find(c=>c.full_name.toLowerCase()==owner.value.trim().toLowerCase());const owned=customer?pets.filter(p=>String(p.customer_id)==String(customer.customer_id)):[];pet.innerHTML=owned.map(p=>`<option value="${p.pet_id}">${esc(p.name)}</option>`).join('');details()};
@@ -207,7 +211,7 @@ async function section(key){
     if(key=='pets'&&name=='customer_id')return `<label>Dog owner registration<input name="dog_owner_name" placeholder="Enter customer name" autocomplete="off" required></label>`;
     if(type=='select')return `<label>${label}<select name="${name}" required>${options.map(o=>`<option>${esc(o)}</option>`).join('')}</select></label>`;
     return `<label>${label}<input name="${name}" type="${type}" required ${type=='number'?'min="0" step="1"':''} ${key=='users'&&name=='password'?'minlength="8"':''}></label>`;
-  }).join('')}<button>Add record</button></form>`+table(rows,definition.columns,key=='products'?r=>`<label>Qty to add<input type="number" min="1" step="1" value="1" aria-label="Quantity to add for ${esc(r.name)}" data-restock-quantity="${r.product_id}" style="width:90px;min-width:90px"></label><button class="small" data-restock="${r.product_id}">Add stock</button>`:r=>actions(key,r));
+  }).join('')}<button>${key=='users'?'Add user':'Add record'}</button></form>`+(key=='users'?[['Staff accounts','Staff'],['Administrator accounts','Administrator'],['Customer accounts','Customer']].map(([label,role])=>{const accounts=rows.filter(r=>r.role===role);return `<h3>${label} (${accounts.length})</h3>${table(accounts,definition.columns,r=>actions(key,r))}`}).join(''):table(rows,definition.columns,key=='products'?r=>`<label>Qty to add<input type="number" min="1" step="1" value="1" aria-label="Quantity to add for ${esc(r.name)}" data-restock-quantity="${r.product_id}" style="width:90px;min-width:90px"></label><button class="small" data-restock="${r.product_id}">Add stock</button>`:r=>actions(key,r)));
   if(key=='pets')$('#pet-search').oninput=e=>{const term=e.target.value.toLowerCase();main.querySelectorAll('tbody tr').forEach(row=>row.style.display=row.textContent.toLowerCase().includes(term)?'':'none')};
   bindForm(key);
 }
@@ -261,11 +265,17 @@ document.addEventListener('click',async e=>{
   }
   const deleteButton=e.target.closest('[data-delete]');if(deleteButton&&confirm(current=='customers'?'Delete this customer? Their pets and grooming appointments will also be deleted, sales history will be kept without the customer link, and their customer login will be deactivated.':'Delete this record?'))try{await api('/'+current+'/'+deleteButton.dataset.delete,'DELETE');go(current)}catch(error){alert(error.message)}
   const action=e.target.closest('[data-action]');
+  if(action&&action.dataset.action=='verify-pickup')try{await api('/pickups/'+action.dataset.id+'/verify','POST');go(current)}catch(error){alert(error.message)}
   if(action&&action.dataset.action=='release')try{await api('/pickups/'+action.dataset.id+'/release','POST');go(current)}catch(error){alert(error.message)}
   if(action&&action.dataset.action=='register-appointment')try{
     const res=await api('/appointments/'+action.dataset.id+'/register','POST');
     $('#feedback')&&($('#feedback').innerHTML=`<div class="alert success">${esc(res.message||'Appointment registered in schedule successfully')}</div>`);
     go('appointments');
+  }catch(error){alert(error.message)}
+  if(action&&action.dataset.action=='complete-appointment')try{
+    const result=await api('/appointments/'+action.dataset.id+'/complete','POST');
+    window.pickupNotice=result.message;
+    go('pickups');
   }catch(error){alert(error.message)}
   const restoreButton=e.target.closest('[data-restore]');
   if(restoreButton&&confirm('Restore this backup? The server may restart.'))try{await api('/admin/restore','POST',{file:restoreButton.dataset.restore});alert('Restore staged. Restart the server to apply it.')}catch(error){alert(error.message)}
