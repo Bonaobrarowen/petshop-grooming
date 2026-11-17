@@ -1,5 +1,5 @@
-// Universal API client: calls backend /api if available (Node.js/Render/localhost),
-// and seamlessly falls back to client-side localStorage on static hosts like GitHub Pages.
+// Universal API client: uses the configured shared backend on GitHub Pages and
+// keeps localStorage fallback only for unconfigured static/demo use.
 
 (function () {
   const STORAGE_KEY = 'petshop_local_db_v1';
@@ -536,14 +536,20 @@
   // Universal API caller
   window.petshopApi = async function (path, method = 'GET', body, token) {
     const isStaticDeploy = location.hostname.endsWith('github.io') || location.protocol === 'file:';
+    const apiBase = String(window.PETSHOP_API_BASE_URL || '').replace(/\/+$/, '');
     const cleanPath = path.split('?')[0];
     const requiresSharedBackend = method === 'POST' &&
       ['/auth/signup', '/customer/appointments', '/public/appointments'].includes(cleanPath);
     const sharedBackendError = 'This GitHub Pages site has no shared server, so the request was not saved. Start the app with "npm start" and open http://localhost:3000, or use your hosted backend URL.';
-    if (isStaticDeploy && requiresSharedBackend) throw new Error(sharedBackendError);
-    if (!isStaticDeploy) {
+    if (apiBase && token && token.startsWith('mock.')) {
+      localStorage.removeItem('tok');
+      localStorage.removeItem('me');
+      token = null;
+    }
+    if (isStaticDeploy && !apiBase && requiresSharedBackend) throw new Error(sharedBackendError);
+    if (!isStaticDeploy || apiBase) {
       try {
-        const response = await fetch('/api' + path, {
+        const response = await fetch((apiBase || '/api') + path, {
           method,
           headers: {
             'Content-Type': 'application/json',
@@ -562,10 +568,12 @@
           if (!response.ok) throw new Error(data.error || 'Request failed');
           return data;
         }
+        if (apiBase) throw new Error('The shared app server returned an unexpected response. Check the configured API URL.');
       } catch (err) {
         if (err.message && !err.message.includes('fetch') && !err.message.includes('NetworkError')) {
           throw err;
         }
+        if (apiBase) throw new Error('Unable to reach the shared app server. Please try again later.');
         if (requiresSharedBackend) throw new Error(sharedBackendError);
       }
     }

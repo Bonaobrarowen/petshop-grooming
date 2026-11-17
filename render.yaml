@@ -19,6 +19,8 @@ services:
         value: /var/data/backups
       - key: LOGS_DIR
         value: /var/data/logs
+      - key: CORS_ORIGINS
+        value: https://bonaobrarowen.github.io,https://petshop-grooming.onrender.com
       - key: LOW_STOCK_DEFAULT
         value: "5"
       - key: SEED_SAMPLE_DATA

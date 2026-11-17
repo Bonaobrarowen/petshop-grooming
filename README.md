@@ -66,17 +66,18 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
    - Public booking page: [http://localhost:3000/book.html](http://localhost:3000/book.html)
 4. Keep the terminal open while using the system. To stop the server, press **Ctrl+C** in that terminal.
 
-The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new empty database is initialized with sample records. Open the site through the server URL above; opening an HTML file directly or deploying only to GitHub Pages does not provide the shared backend, including OTP email. Customer account registration and appointment requests are rejected in static-only mode rather than being saved only in one browser. Use the same running backend URL for the customer and staff/admin portals so all requests reach the shared database.
+The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new empty local database is initialized with sample records. GitHub Pages hosts only the frontend; shared sign-in, customer registration, and appointments work only when the frontend is configured to contact a running backend. Without that API configuration, the page may use browser-local demo data, but new signups and appointment requests are blocked instead of being presented as shared. OTP recovery also requires configured SMTP email.
 
-## Deploy the live app with Render
+## Deploy the live app with GitHub Pages and Render
 
-The source code stays in this GitHub repository. The root `render.yaml` deploys the Node.js app from the repository and serves both the website and API from one Render URL. A persistent disk stores SQLite data, backups, and logs between restarts.
+The website frontend is published from this GitHub repository to GitHub Pages. Render runs the Node.js API and stores the shared SQLite database, backups, and logs on a persistent disk. Customers and staff open the GitHub Pages URL; the browser sends API requests to the configured Render URL in `public/api-config.js`.
 
 1. In Render, choose **New → Blueprint**, connect `Bonaobrarowen/petshop-grooming`, and deploy the `main` branch.
 2. Review the plan before confirming: Render persistent disks require a paid web service and may incur charges.
-3. Use the generated Render URL for both staff/admin and customer access. GitHub Pages remains a static preview; it cannot save shared registrations or appointments.
-4. The Render database starts without sample customers or appointments. It creates the default `admin` account; change its password, then create staff accounts and inventory.
-5. To enable OTP password recovery, configure the SMTP variables from `.env.example` in the Render service's **Environment** settings.
+3. Keep the Render service URL as `https://petshop-grooming.onrender.com`, or update `public/api-config.js` to the actual URL Render assigns, including `/api`; push that change to GitHub so Pages redeploys.
+4. Open `https://bonaobrarowen.github.io/petshop-grooming/` for the staff/admin portal and customer site. Both use the same Render database.
+5. The Render database starts without sample customers or appointments. It creates the default `admin` account; change its password, then create staff accounts and inventory.
+6. To enable OTP password recovery, configure the SMTP variables from `.env.example` in the Render service's **Environment** settings.
 
 ---
 
