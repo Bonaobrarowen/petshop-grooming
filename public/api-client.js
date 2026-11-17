@@ -77,7 +77,7 @@
   }
 
   function saveDb(db) {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); } catch (e) {}
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
   }
 
   function getUserFromToken(token) {

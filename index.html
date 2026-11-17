@@ -263,7 +263,12 @@ document.addEventListener('click',async e=>{
     try{await api(`/products/${id}/restock`,'POST',{quantity});await go(current)}
     catch(error){alert(error.message);restockButton.disabled=false}
   }
-  const deleteButton=e.target.closest('[data-delete]');if(deleteButton&&confirm(current=='customers'?'Delete this customer? Their pets and grooming appointments will also be deleted, sales history will be kept without the customer link, and their customer login will be deactivated.':'Delete this record?'))try{await api('/'+current+'/'+deleteButton.dataset.delete,'DELETE');go(current)}catch(error){alert(error.message)}
+  const deleteButton=e.target.closest('[data-delete]');
+  if(deleteButton&&confirm(current=='customers'?'Delete this customer? Their pets and grooming appointments will also be deleted, sales history will be kept without the customer link, and their customer login will be deactivated.':'Delete this record?')){
+    deleteButton.disabled=true;
+    try{await api('/'+current+'/'+deleteButton.dataset.delete,'DELETE');await go(current)}
+    catch(error){alert(error.message);deleteButton.disabled=false}
+  }
   const action=e.target.closest('[data-action]');
   if(action&&action.dataset.action=='verify-pickup')try{await api('/pickups/'+action.dataset.id+'/verify','POST');go(current)}catch(error){alert(error.message)}
   if(action&&action.dataset.action=='release')try{await api('/pickups/'+action.dataset.id+'/release','POST');go(current)}catch(error){alert(error.message)}
