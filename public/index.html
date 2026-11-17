@@ -65,7 +65,7 @@ const definitions={
   products:{title:'Inventory Management',columns:['product_id','name','category','price','stock_quantity','reorder_level','barcode'],fields:[['name','Product name'],['category','Category','select',['Food','Grooming','Accessories','Treats','Health & Care','Toys','Cleaning & Hygiene','Pet Supplies']],['price','Price','number'],['stock_quantity','Stock','number'],['reorder_level','Reorder level','number'],['barcode','Barcode']]},
   appointments:{title:'Grooming schedules',columns:['appointment_id','pet_id','pet_name','owner_customer_id','owner_name','owner_phone','service','appointment_date','price','status'],fields:[['pet_id','Pet'],['service','Service'],['appointment_date','Date and time','datetime-local'],['price','Price','number']]},
   pickups:{title:'Pet pickup',columns:['pickup_id','pet_id','person_name','relationship','contact','id_presented','authorization_status','released_at'],fields:[['pet_id','Pet ID','number'],['person_name','Authorized person'],['relationship','Relationship'],['contact','Contact number'],['id_presented','ID presented?','number'],['authorization_status','Verification status']]},
-  users:{title:'Users',columns:['user_id','username','full_name','role','status'],fields:[['username','Username'],['full_name','Full name'],['password','Password','password'],['role','Role','select',['Staff','Administrator']],['status','Status','select',['Active','Inactive']]]}
+  users:{title:'Users',columns:['user_id','username','full_name','role','status'],fields:[['username','Username'],['full_name','Full name'],['email','Recovery email','email'],['password','Password (8+ characters)','password'],['role','Role','select',['Staff','Administrator']],['status','Status','select',['Active','Inactive']]]}
 };
 async function dashboard(){
   clearInterval(window.dashboardClock);const d=await api('/dashboard');
@@ -134,13 +134,14 @@ async function pos(){
   };draw();
 }
 function actions(key,item){
-  const id=typeof item==='object'&&item!==null?(item.appointment_id||item.pickup_id||item[definitions[key]?.columns[0]]):item;
+  const id=typeof item==='object'&&item!==null?(key=='customers'?item.customer_id:item.appointment_id||item.pickup_id||item[definitions[key]?.columns[0]]):item;
   const status=typeof item==='object'&&item!==null?item.status:'';
   let html='';
   if(key=='pickups')html+=`<button class="small" data-action="release" data-id="${id}">Release pet</button> `;
   if(key=='appointments'){
     if(status==='Pending')html+=`<button class="small register" data-action="register-appointment" data-id="${id}" title="Register this schedule into the system in 1 push">Register</button> `;
   }
+  if(key=='users')html+=`<label>Recovery email<input type="email" value="${esc(item.email||'')}" data-user-email="${id}" required></label><button class="small" data-save-user-email="${id}">Save email</button> `;
   if(user.role=='Administrator')html+=`<button class="small delete" data-delete="${id}">Delete</button>`;
   return html;
 }
@@ -205,8 +206,8 @@ async function section(key){
   main.innerHTML=`<h2>${definition.title}</h2><div id="feedback"></div>${key=='pets'?'<label>Search pet name<input id="pet-search" type="search"></label>':''}<form id="record-form">${definition.fields.map(([name,label,type='text',options])=>{
     if(key=='pets'&&name=='customer_id')return `<label>Dog owner registration<input name="dog_owner_name" placeholder="Enter customer name" autocomplete="off" required></label>`;
     if(type=='select')return `<label>${label}<select name="${name}" required>${options.map(o=>`<option>${esc(o)}</option>`).join('')}</select></label>`;
-    return `<label>${label}<input name="${name}" type="${type}" required ${type=='number'?'min="0" step="1"':''}></label>`;
-  }).join('')}<button>Add record</button></form>`+table(rows,definition.columns,r=>actions(key,r));
+    return `<label>${label}<input name="${name}" type="${type}" required ${type=='number'?'min="0" step="1"':''} ${key=='users'&&name=='password'?'minlength="8"':''}></label>`;
+  }).join('')}<button>Add record</button></form>`+table(rows,definition.columns,key=='products'?r=>`<label>Qty to add<input type="number" min="1" step="1" value="1" aria-label="Quantity to add for ${esc(r.name)}" data-restock-quantity="${r.product_id}" style="width:90px;min-width:90px"></label><button class="small" data-restock="${r.product_id}">Add stock</button>`:r=>actions(key,r));
   if(key=='pets')$('#pet-search').oninput=e=>{const term=e.target.value.toLowerCase();main.querySelectorAll('tbody tr').forEach(row=>row.style.display=row.textContent.toLowerCase().includes(term)?'':'none')};
   bindForm(key);
 }
@@ -244,7 +245,21 @@ async function go(key){
   try{({dashboard,low:lowStock,pos,sales:salesHistory,backup}[key]?await ({dashboard,low:lowStock,pos,sales:salesHistory,backup}[key])():await section(key))}catch(error){main.innerHTML=`<div class="alert error">${esc(error.message)}</div>`}
 }
 document.addEventListener('click',async e=>{
-  const deleteButton=e.target.closest('[data-delete]');if(deleteButton&&confirm('Delete this record?'))try{await api('/'+current+'/'+deleteButton.dataset.delete,'DELETE');go(current)}catch(error){alert(error.message)}
+  const saveUserEmail=e.target.closest('[data-save-user-email]');
+  if(saveUserEmail){
+    const id=saveUserEmail.dataset.saveUserEmail,email=main.querySelector(`[data-user-email="${id}"]`).value;
+    saveUserEmail.disabled=true;
+    try{await api(`/users/${id}`,'PUT',{email});await go(current)}
+    catch(error){alert(error.message);saveUserEmail.disabled=false}
+  }
+  const restockButton=e.target.closest('[data-restock]');
+  if(restockButton){
+    const id=restockButton.dataset.restock,quantity=main.querySelector(`[data-restock-quantity="${id}"]`).value;
+    restockButton.disabled=true;
+    try{await api(`/products/${id}/restock`,'POST',{quantity});await go(current)}
+    catch(error){alert(error.message);restockButton.disabled=false}
+  }
+  const deleteButton=e.target.closest('[data-delete]');if(deleteButton&&confirm(current=='customers'?'Delete this customer? Their pets and grooming appointments will also be deleted, sales history will be kept without the customer link, and their customer login will be deactivated.':'Delete this record?'))try{await api('/'+current+'/'+deleteButton.dataset.delete,'DELETE');go(current)}catch(error){alert(error.message)}
   const action=e.target.closest('[data-action]');
   if(action&&action.dataset.action=='release')try{await api('/pickups/'+action.dataset.id+'/release','POST');go(current)}catch(error){alert(error.message)}
   if(action&&action.dataset.action=='register-appointment')try{
@@ -257,10 +272,31 @@ document.addEventListener('click',async e=>{
 });
 function start(){
   if(!token){
-    let signup=false;
+    let signup=false,recoveryStep=0,recoveryUsername='',loginNotice='';
     const render=()=>{
-      $('#root').innerHTML=`<div class="auth-shell"><div class="login-card"><h1>Pet Shop Grooming</h1>${signup?`<h2>Customer Registration</h2>`:``}<form id="auth">${signup?'<label>Full name<input name="fullName" required></label><label>Mobile number<input name="phone" required pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX"></label><label>Email (optional)<input name="email" type="email"></label><label>Address (optional)<input name="address"></label>':''}<label>Username<input name="username" required minlength="3"></label><label>Password<input name="password" type="password" required minlength="${signup?6:1}"></label>${signup?' <label>Confirm password<input name="confirm" type="password" required minlength="6"></label>':''}<button>${signup?'Create customer account & sign in':'Login'}</button><div id="auth-feedback"></div></form><div class="switch">${signup?'Already have an account?':'New customer?'} <a id="switch">${signup?'Login here':'Create an account'}</a></div></div></div>`;
+      if(recoveryStep){
+        $('#root').innerHTML=`<div class="auth-shell"><div class="login-card"><h1>Pet Shop Grooming</h1><h2>Forgot password</h2><form id="recovery-form">${recoveryStep==1?'<label>Username<input name="username" required autocomplete="username"></label><button>Send OTP</button>':'<p>Enter the 6-digit code sent to your registered email and choose a new password.</p><label>OTP<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required></label><label>New password<input name="password" type="password" minlength="8" required autocomplete="new-password"></label><button>Reset password</button>'}<div id="auth-feedback"></div></form><div class="switch"><a id="back-login">Back to login</a></div></div></div>`;
+        $('#back-login').onclick=()=>{recoveryStep=0;loginNotice='';render()};
+        $('#recovery-form').onsubmit=async event=>{
+          event.preventDefault();const form=new FormData(event.target);
+          try{
+            if(recoveryStep==1){
+              recoveryUsername=String(form.get('username')).trim();
+              const result=await api('/auth/password-reset/request','POST',{username:recoveryUsername});
+              recoveryStep=2;render();
+              $('#auth-feedback').innerHTML=`<div class="alert success">${esc(result.message)} If no code arrives, contact the administrator to check your recovery email.</div>`;
+            }else{
+              const result=await api('/auth/password-reset/complete','POST',{username:recoveryUsername,code:form.get('code'),password:form.get('password')});
+              recoveryStep=0;loginNotice=result.message;render();
+              $('#auth-feedback').innerHTML=`<div class="alert success">${esc(loginNotice)}</div>`;
+            }
+          }catch(error){$('#auth-feedback').innerHTML=`<div class="alert error">${esc(error.message)}</div>`}
+        };
+        return;
+      }
+      $('#root').innerHTML=`<div class="auth-shell"><div class="login-card"><h1>Pet Shop Grooming</h1>${signup?`<h2>Customer Registration</h2>`:``}<form id="auth">${signup?'<label>Full name<input name="fullName" required></label><label>Mobile number<input name="phone" required pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX"></label><label>Email<input name="email" type="email" required></label><label>Address (optional)<input name="address"></label>':''}<label>Username<input name="username" required minlength="3"></label><label>Password<input name="password" type="password" required minlength="${signup?8:1}"></label>${signup?' <label>Confirm password<input name="confirm" type="password" required minlength="8"></label>':''}<button>${signup?'Create customer account & sign in':'Login'}</button><div id="auth-feedback">${loginNotice?`<div class="alert success">${esc(loginNotice)}</div>`:''}</div></form><div class="switch">${signup?'Already have an account?':'New customer?'} <a id="switch">${signup?'Login here':'Create an account'}</a>${signup?'':' &middot; <a id="forgot">Forgot password?</a>'}</div></div></div>`;
       $('#switch').onclick=()=>{signup=!signup;render()};
+      if(!signup)$('#forgot').onclick=()=>{recoveryStep=1;loginNotice='';render()};
       $('#auth').onsubmit=async event=>{event.preventDefault();const form=new FormData(event.target);if(signup&&form.get('password')!=form.get('confirm')){$('#auth-feedback').innerHTML='<div class="alert error">Passwords do not match</div>';return}
         try{const data=await api(signup?'/auth/signup':'/auth/login','POST',signup?{fullName:form.get('fullName'),phone:form.get('phone'),email:form.get('email'),address:form.get('address'),username:form.get('username'),password:form.get('password')}:{username:form.get('username'),password:form.get('password')});token=data.token;user=data.user;localStorage.setItem('tok',token);localStorage.setItem('me',JSON.stringify(user));if(user.role=='Customer'){location.href='customer-dashboard.html';return}start()}catch(error){$('#auth-feedback').innerHTML=`<div class="alert error">${esc(error.message)}</div>`}
       };

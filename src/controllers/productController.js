@@ -42,5 +42,15 @@ module.exports = {
     validate(q.body);
     base.update(q, s);
   },
+  restock(q, s) {
+    const quantity = Number(q.body.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      throw bad('Quantity to add must be a positive whole number');
+    }
+    const product = Product.get(q.params.id);
+    if (!product) throw bad('Product not found', 404);
+    db.prepare('UPDATE product_inventory SET stock_quantity=stock_quantity+? WHERE product_id=?').run(quantity, q.params.id);
+    s.json(Product.get(q.params.id));
+  },
   remove: base.remove
 };

@@ -19,5 +19,14 @@ module.exports = {
   list: base.list,
   create(q, s) { base.create({ ...q, body: prepare(q.body) }, s); },
   update(q, s) { base.update({ ...q, body: prepare(q.body) }, s); },
-  remove: base.remove
+  remove(q, s) {
+    const customer = Customer.get(q.params.id);
+    if (!customer) throw bad('Customer not found', 404);
+    db.transaction(() => {
+      db.prepare('UPDATE sales SET customer_id=NULL WHERE customer_id=?').run(q.params.id);
+      db.prepare("UPDATE user_account SET customer_id=NULL, status='Inactive' WHERE customer_id=?").run(q.params.id);
+      Customer.remove(q.params.id);
+    })();
+    s.json({ ok: true });
+  }
 };

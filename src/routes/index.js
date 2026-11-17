@@ -9,6 +9,8 @@ const appointments = require('../controllers/appointmentController');
 
 r.post('/auth/login', require('../controllers/authController').login);
 r.post('/auth/signup', require('../controllers/authController').signup);
+r.post('/auth/password-reset/request', require('../controllers/passwordResetController').request);
+r.post('/auth/password-reset/complete', require('../controllers/passwordResetController').reset);
 r.post('/public/appointments', require('../controllers/publicBookingController').create);
 r.use(auth);
 r.get('/customer/profile', require('../controllers/customerDashboardController').profile);
@@ -21,6 +23,7 @@ r.get('/appointments', history.appointments);
 mount('/customers', require('../controllers/customerController'));
 mount('/pets', require('../controllers/petController'));
 mount('/products', require('../controllers/productController'));
+r.post('/products/:id/restock', require('../controllers/productController').restock);
 mount('/appointments', appointments);
 r.post('/appointments/:id/register', appointments.register);
 mount('/pickups', crud(M.Pickup));

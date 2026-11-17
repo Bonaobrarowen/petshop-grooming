@@ -87,6 +87,9 @@
     const db = initDb();
     const currentUser = getUserFromToken(token);
     const cleanPath = path.split('?')[0];
+    if (cleanPath.startsWith('/auth/password-reset/')) {
+      throw new Error('Password recovery requires the application server and configured SMTP email.');
+    }
 
     // Auth Login
     if (cleanPath === '/auth/login' && method === 'POST') {
@@ -255,6 +258,64 @@
       db.appointments = db.appointments.filter(a => a.appointment_id !== id);
       saveDb(db);
       return { ok: true };
+    }
+
+    // Users CRUD for Staff / Administrator accounts
+    if (cleanPath === '/users') {
+      if (currentUser?.role !== 'Administrator') throw new Error('Administrator access required');
+      if (method === 'GET') {
+        return db.users
+          .map(u => ({ user_id: u.user_id, username: u.username, full_name: u.full_name, email: u.email || '', role: u.role, status: u.status }))
+          .reverse();
+      }
+      if (method === 'POST') {
+        const username = String(body.username || '').trim();
+        if (!username) throw new Error('Username is required');
+        if (db.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+          throw new Error('Username is already taken');
+        }
+        const id = db.users.length + 1;
+        const newUser = {
+          user_id: id,
+          username,
+          password: String(body.password || '').trim(),
+          full_name: String(body.full_name || '').trim() || username,
+          email: String(body.email || '').trim(),
+          role: String(body.role || 'Staff'),
+          status: String(body.status || 'Active'),
+          customer_id: body.customer_id || null
+        };
+        db.users.push(newUser);
+        addLog(db, `Created user account: ${username} (${newUser.role})`);
+        saveDb(db);
+        return { user_id: newUser.user_id, username: newUser.username, full_name: newUser.full_name, role: newUser.role, status: newUser.status };
+      }
+    }
+    if (/^\/users\/\d+$/.test(cleanPath)) {
+      if (currentUser?.role !== 'Administrator') throw new Error('Administrator access required');
+      const id = Number(cleanPath.split('/')[2]);
+      if (method === 'PUT') {
+        const idx = db.users.findIndex(u => u.user_id === id);
+        if (idx < 0) throw new Error('User not found');
+        const updated = { ...db.users[idx], ...body };
+        if (body.username) updated.username = String(body.username).trim();
+        if (body.full_name) updated.full_name = String(body.full_name).trim();
+        if (body.password !== undefined) updated.password = String(body.password).trim();
+        if (body.role) updated.role = String(body.role);
+        if (body.status) updated.status = String(body.status);
+        db.users[idx] = updated;
+        addLog(db, `Updated user account: ${updated.username} (${updated.role})`);
+        saveDb(db);
+        return { user_id: updated.user_id, username: updated.username, full_name: updated.full_name, email: updated.email || '', role: updated.role, status: updated.status };
+      }
+      if (method === 'DELETE') {
+        const before = db.users.length;
+        db.users = db.users.filter(u => u.user_id !== id);
+        if (db.users.length === before) throw new Error('User not found');
+        addLog(db, `Deleted user account #${id}`);
+        saveDb(db);
+        return { ok: true };
+      }
     }
 
     // Products CRUD with duplicate name check

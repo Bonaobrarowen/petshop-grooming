@@ -31,6 +31,11 @@ if (!userSchema.includes("'Customer'")) {
 } else if (!db.prepare('PRAGMA table_info(user_account)').all().some(c => c.name === 'customer_id')) {
   db.exec('ALTER TABLE user_account ADD COLUMN customer_id INTEGER REFERENCES customer(customer_id)');
 }
+if (!db.prepare('PRAGMA table_info(user_account)').all().some(c => c.name === 'email')) {
+  db.exec('ALTER TABLE user_account ADD COLUMN email TEXT');
+}
+db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS user_email_unique
+  ON user_account(lower(trim(email))) WHERE email IS NOT NULL AND trim(email) <> ''`);
 const customerColumns = db.prepare("PRAGMA table_info(customer)").all();
 if (!customerColumns.some(c => c.name === 'customer_identity')) {
   db.exec('ALTER TABLE customer ADD COLUMN customer_identity TEXT');

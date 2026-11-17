@@ -4,55 +4,69 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
 
 ---
 
-## How to Start the System
+## Run the System
 
 ### Requirements
 
-- [Node.js](https://nodejs.org/) (version 18 or higher)
+- [Node.js](https://nodejs.org/) (version 20 or higher)
 - [npm](https://www.npmjs.com/)
+- Windows PowerShell, Command Prompt, or another terminal
 
-### Quick Start Steps
+### First-time setup
 
-1. **Open a terminal** in the project directory:
+1. **Open a terminal** in the project folder:
    ```powershell
-   cd "c:\Users\Windows 10\Documents\pet-shop-grooming-system"
+   cd "C:\Users\Windows 10\Documents\pet-shop-grooming-system"
    ```
 
-2. **Install dependencies** (if not yet installed):
+2. **Install dependencies**:
    ```powershell
    npm install
    ```
 
-3. **Configure Environment File**:
-   If `.env` does not exist, copy `.env.example`:
+3. **Create the environment file** if it does not exist:
    ```powershell
    Copy-Item .env.example .env
    ```
-   Default `.env` configuration:
+   Set a private JWT secret and configure SMTP for password-reset emails. For example:
    ```env
    PORT=3000
-   JWT_SECRET=your_secret_key_here
+   JWT_SECRET=replace-with-a-private-random-secret
    LOW_STOCK_DEFAULT=5
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_SECURE=false
+   SMTP_USER=your-email@gmail.com
+   SMTP_PASS=your-email-app-password
+   SMTP_FROM="Pet Shop Grooming <your-email@gmail.com>"
+   OTP_SECRET=replace-with-a-private-random-secret-at-least-32-characters-long
    ```
+   Generate a random secret for `OTP_SECRET` with:
+   ```powershell
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+   `OTP_SECRET` must be at least 32 characters. For Gmail, use an App Password (not your regular account password). Keep `.env` private and restart the server after changing it. SMTP settings are required for password-reset email; without them, the rest of the system can still run but email recovery is unavailable.
 
-4. **(Optional) Load / Reset Sample Data**:
-   To seed sample accounts, customers, pets, inventory items, and grooming schedules:
+4. **Optional: load sample data** on a new/test database:
    ```powershell
    npm run seed
    ```
+   **Warning:** seeding clears and replaces the current accounts, customers, pets, products, appointments, pickups, sales, and payments with sample data. Do not run this on a database you need to keep.
 
-5. **Start the server**:
+### Start and open the system
+
+1. From the project folder, start the backend and web server:
    ```powershell
    npm start
    ```
+2. Wait for the message `Pet shop system running at http://localhost:3000`.
+3. Open these URLs in a browser:
+   - Staff / Admin portal and login: [http://localhost:3000](http://localhost:3000)
+   - Customer portal: [http://localhost:3000/customer-dashboard.html](http://localhost:3000/customer-dashboard.html)
+   - Public booking page: [http://localhost:3000/book.html](http://localhost:3000/book.html)
+4. Keep the terminal open while using the system. To stop the server, press **Ctrl+C** in that terminal.
 
-6. **Access the application in your browser**:
-   - Staff / Admin Portal & Login: [http://localhost:3000](http://localhost:3000)
-   - Customer Portal: [http://localhost:3000/customer-dashboard.html](http://localhost:3000/customer-dashboard.html)
-   - Public Booking Page: [http://localhost:3000/book.html](http://localhost:3000/book.html)
-
-7. **To stop the server**:
-   In the terminal running the server, press `Ctrl + C`.
+The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new empty database is initialized with sample records. Open the site through the server URL above; opening an HTML file directly does not provide the backend functions, including OTP email.
 
 ---
 
@@ -63,8 +77,28 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
 | `admin` | `admin123` | Administrator | Full access to users, backups, audit trails, and deletion |
 | `staff_anna` | `staff123` | Staff | Access to POS, inventory, customers, pets, and grooming schedules |
 | `staff_mark` | `staff123` | Staff | Access to POS, inventory, customers, pets, and grooming schedules |
+| `juan` | `customer123` | Customer | Sample customer portal account |
+| `maria` | `customer123` | Customer | Sample customer portal account |
 
 *New customers can register their account directly on the login page via **Create an account** or sign in to access the **My Pet Appointments** customer portal.*
+
+These are sample credentials. Change them before using a deployed system. The seeded staff and administrator accounts do not have recovery emails; an administrator must set their recovery emails in **System users** before those accounts can use OTP recovery.
+
+## Accounts and permissions
+
+- **Staff** can use POS, inventory, customers, pets, and grooming schedules. Staff can add products, add incoming stock to existing products, and register pending online appointments.
+- **Administrators** can do staff tasks, add Staff or Administrator accounts, manage recovery emails, create/restore backups, and delete records.
+- **Only Administrators** can delete customers. Deleting a customer also deletes their pets and grooming appointments, keeps sales history without its customer link, and deactivates any linked customer login. The confirmation dialog explains this before proceeding.
+- **Customers** can register an account with an email address, book grooming appointments, and view their appointment status in the customer portal.
+- New staff/admin accounts require a unique username and recovery email, a role, and a password of at least 8 characters. Existing accounts' recovery emails can be changed in **System users**.
+
+### Forgot password / OTP
+
+1. On the login page, select **Forgot password?** and enter the account username.
+2. If the account is active and has a registered recovery email, the system sends a six-digit OTP to that email.
+3. Enter the OTP and a new password of at least 8 characters.
+
+OTP codes expire after 10 minutes, can only be used once, and allow up to five verification attempts. Requests are limited to one email per account per minute. The system stores a hash of the OTP rather than the code itself. The application must be running with valid SMTP settings and an `OTP_SECRET`; configure these in `.env` as described above. Staff/admin accounts use their saved recovery email. Customer accounts use the email saved on their customer profile unless an administrator has set an account-specific recovery email.
 
 ---
 
@@ -85,9 +119,18 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
   - Server API validates incoming names on both creation and modification, returning a clear error: `An item named "..." already exists. Duplicate item names cannot be input.`
   - SQLite database includes a unique index (`product_name_unique`) on `LOWER(TRIM(name))` ensuring strict database integrity.
 
-### 3. Scrollable Database Backup & Recovery Audit Trail
-- **Scrollable Trail (No Side Overflow)**: The system log and audit trail (`#system-log`) is wrapped in a constrained scroll container (`max-height: 300px; max-width: 100%; overflow-y: auto; overflow-x: auto; white-space: pre-wrap; word-break: break-word`).
-- **Clean Layout**: Long log entries wrap cleanly and scroll smoothly within the container without stretching the layout horizontally or getting long in the side.
+### 3. Inventory stock additions
+- Existing products have a **Qty to add** field and **Add stock** button in the inventory list.
+- Added stock is summed with the current quantity; it does not replace existing stock. Only positive whole-number quantities are accepted.
+
+### 4. Account and customer management
+- Administrators can create Staff and Administrator accounts and set or update their recovery emails from **System users**.
+- Customer deletion uses the customer's database ID and is restricted to administrators. The confirmation describes related records affected by deletion.
+- The login page supports email-based OTP password recovery when SMTP is configured.
+
+### 5. Scrollable Database Backup & Recovery Audit Trail
+- System and error trails are available to administrators, with a refresh control.
+- Backup files and long log entries are displayed in scrollable containers to keep the page usable.
 - **Trail Switcher & Refresh**: Admins can switch between **System trail** and **Error trail** using a dropdown and refresh the trail on demand.
 - **Scrollable Backup Archive**: Backup files list is presented inside a vertical scroll container for clean navigation.
 
@@ -112,6 +155,7 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
 
 ### Inventory Management
 - Tracks Item Name, Category, Price, Stock Quantity, Reorder Level, and Barcode.
+- Add a new product with its starting stock, or use **Qty to add** on an existing product to record a delivery/restock without overwriting current stock.
 - Categories: `Food`, `Grooming`, `Accessories`, `Treats`, `Health & Care`, `Toys`, `Cleaning & Hygiene`, `Pet Supplies`.
 - Low-stock warning alerts when stock is at or below the reorder level.
 
@@ -119,6 +163,12 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
 - Customer profiles with unique ID (`CUST-XXXX`), contact details, and address.
 - Pet records with unique Pet Code (`PXXXX`), species, breed, and age, linked to the registered owner.
 - Complete customer history with pet counts, grooming counts, and purchase history.
+- Customer deletion is administrator-only and removes linked pets and grooming appointments; sales history is retained with the customer association cleared.
+
+### User Accounts
+- Administrators create Staff or Administrator accounts in **System users** and can update each account's recovery email.
+- Staff can add products and register pending online appointments; only administrators can manage users, backups, and deletions.
+- **Forgot password** emails a time-limited OTP to the account's recovery email. SMTP and `OTP_SECRET` must be configured in `.env`.
 
 ### Grooming Appointments
 - Supports walk-in bookings and customer online booking.

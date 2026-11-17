@@ -17,9 +17,11 @@ exports.signup = (q, s) => {
   const password = String(q.body.password || '');
   const fullName = String(q.body.fullName || '').trim();
   const phone = String(q.body.phone || '').trim();
-  if (!username || !password || !fullName) throw bad('Full name, username, and password are required');
+  const email = String(q.body.email || '').trim().toLowerCase();
+  if (!username || !password || !fullName || !email) throw bad('Full name, email, username, and password are required');
   if (username.length < 3) throw bad('Username must be at least 3 characters');
-  if (password.length < 6) throw bad('Password must be at least 6 characters');
+  if (password.length < 8) throw bad('Password must be at least 8 characters');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw bad('Enter a valid email address');
   if (User.byName(username)) throw bad('Username is already taken');
   const customer = require('../../config/database').db.prepare(
     'SELECT * FROM customer WHERE lower(full_name)=lower(?) AND (phone=? OR phone IS NULL OR phone=\'\') LIMIT 1'
@@ -30,7 +32,9 @@ exports.signup = (q, s) => {
     customerId = require('../../config/database').db.prepare(
       'INSERT INTO customer(customer_identity, full_name, phone, email, address) VALUES (?, ?, ?, ?, ?)'
     ).run(`CUST-${String(next).padStart(4, '0')}`, fullName, phone,
-      String(q.body.email || '').trim(), String(q.body.address || '').trim()).lastInsertRowid;
+      email, String(q.body.address || '').trim()).lastInsertRowid;
+  } else {
+    require('../../config/database').db.prepare('UPDATE customer SET email=? WHERE customer_id=?').run(email, customerId);
   }
   const id = User.create({
     username,
