@@ -1,7 +1,6 @@
 require('dotenv').config();
 const Database = require('better-sqlite3'), fs = require('fs'), path = require('path'), bcrypt = require('bcryptjs');
-const file = path.resolve(process.env.DATABASE_PATH || path.join(__dirname, '..', 'database', 'petshop.db'));
-fs.mkdirSync(path.dirname(file), { recursive: true });
+const file = path.join(__dirname, '..', 'database', 'petshop.db');
 if (fs.existsSync(file + '.restore')) fs.renameSync(file + '.restore', file); // staged restore
 const db = new Database(file);
 db.pragma('foreign_keys = ON');
@@ -84,7 +83,7 @@ if (!db.prepare('SELECT 1 FROM user_account').get()) { // seed default admin
   db.prepare('INSERT INTO user_account(username,password_hash,full_name,role) VALUES (?,?,?,?)')
     .run('admin', bcrypt.hashSync('admin123', 10), 'System Administrator', 'Administrator');
 }
-if (process.env.SEED_SAMPLE_DATA !== 'false' && !db.prepare('SELECT 1 FROM product_inventory').get()) {
+if (!db.prepare('SELECT 1 FROM product_inventory').get()) {
   try {
     require('../database/seed');
   } catch (err) {

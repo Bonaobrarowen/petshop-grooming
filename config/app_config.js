@@ -1,7 +1,6 @@
 require('dotenv').config();
 const fs = require('fs'), path = require('path');
-const logsDir = path.resolve(process.env.LOGS_DIR || path.join(__dirname, '..', 'logs'));
-fs.mkdirSync(logsDir, { recursive: true });
+const logsDir = path.join(__dirname, '..', 'logs');
 module.exports = {
   port: process.env.PORT || 3000,
   lowStockDefault: Number(process.env.LOW_STOCK_DEFAULT || 5),

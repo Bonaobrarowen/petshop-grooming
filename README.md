@@ -66,18 +66,11 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
    - Public booking page: [http://localhost:3000/book.html](http://localhost:3000/book.html)
 4. Keep the terminal open while using the system. To stop the server, press **Ctrl+C** in that terminal.
 
-The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new empty local database is initialized with sample records. GitHub Pages hosts only the frontend; shared sign-in, customer registration, and appointments work only when the frontend is configured to contact a running backend. Without that API configuration, the page may use browser-local demo data, but new signups and appointment requests are blocked instead of being presented as shared. OTP recovery also requires configured SMTP email.
+The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new local database is initialized with sample records. GitHub Pages is static-only, so the public site runs in demo mode: demo accounts and changes are stored only in that browser. New customer signup and appointment requests are blocked because they cannot be shared with staff/admin without a backend server. Use the local Node server described above for shared registrations and appointments.
 
-## Deploy the live app with GitHub Pages and Render
+## GitHub Pages demo
 
-The website frontend is published from this GitHub repository to GitHub Pages. Render runs the Node.js API and stores the shared SQLite database, backups, and logs on a persistent disk. Customers and staff open the GitHub Pages URL; the browser sends API requests to the configured Render URL in `public/api-config.js`.
-
-1. In Render, choose **New → Blueprint**, connect `Bonaobrarowen/petshop-grooming`, and deploy the `main` branch.
-2. Review the plan before confirming: Render persistent disks require a paid web service and may incur charges.
-3. Keep the Render service URL as `https://petshop-grooming.onrender.com`, or update `public/api-config.js` to the actual URL Render assigns, including `/api`; push that change to GitHub so Pages redeploys.
-4. Open `https://bonaobrarowen.github.io/petshop-grooming/` for the staff/admin portal and customer site. Both use the same Render database.
-5. The Render database starts without sample customers or appointments. It creates the default `admin` account; change its password, then create staff accounts and inventory.
-6. To enable OTP password recovery, configure the SMTP variables from `.env.example` in the Render service's **Environment** settings.
+Open the site at `https://bonaobrarowen.github.io/petshop-grooming/`. The demo login data is stored in the browser and is not connected to the local SQLite database. Do not enter real customer information or treat demo logins, inventory changes, or appointments as real records. New customer registration and appointment submissions are unavailable on GitHub Pages.
 
 ---
 
@@ -91,16 +84,16 @@ The website frontend is published from this GitHub repository to GitHub Pages. R
 | `juan` | `customer123` | Customer | Sample customer portal account |
 | `maria` | `customer123` | Customer | Sample customer portal account |
 
-*New customers can register their account directly on the login page via **Create an account** or sign in to access the **My Pet Appointments** customer portal.*
+*On a server deployment, new customers can register through **Create an account** or sign in to access the customer portal. GitHub Pages demo mode does not support new customer registration.*
 
-These are sample credentials. Change them before using a deployed system. The seeded staff and administrator accounts do not have recovery emails; an administrator must set their recovery emails in **System users** before those accounts can use OTP recovery.
+These are sample credentials for the local demo. On GitHub Pages, they only sign in to browser-local demo data and are not secure production accounts. The seeded staff and administrator accounts do not have recovery emails; an administrator must set their recovery emails in **System users** before those accounts can use OTP recovery on a server deployment.
 
 ## Accounts and permissions
 
 - **Staff** can use POS, inventory, customers, pets, and grooming schedules. Staff can add products, add incoming stock to existing products, and register pending online appointments.
 - **Administrators** can do staff tasks, add Staff or Administrator accounts, manage recovery emails, create/restore backups, and delete records.
 - **Only Administrators** can delete customers. Deleting a customer also deletes their pets and grooming appointments, keeps sales history without its customer link, and deactivates any linked customer login. The confirmation dialog explains this before proceeding.
-- **Customers** can register an account with a valid email address and a password of at least 8 characters, book grooming appointments, and view their appointment status in the customer portal. The newest appointment requests appear first.
+- **Customers** can register an account with a valid email address and a password of at least 8 characters, book grooming appointments, and view their appointment status in a server deployment. The newest appointment requests appear first.
 - New staff/admin accounts require a unique username and recovery email, a role, and a password of at least 8 characters. Existing accounts' recovery emails can be changed in **System users**.
 - The **System users** page shows separate sections for Staff, Administrator, and Customer accounts.
 

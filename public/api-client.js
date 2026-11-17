@@ -1,5 +1,4 @@
-// Universal API client: uses the configured shared backend on GitHub Pages and
-// keeps localStorage fallback only for unconfigured static/demo use.
+// Universal API client: calls the local backend when available and uses browser-local demo data on static hosts.
 
 (function () {
   const STORAGE_KEY = 'petshop_local_db_v1';
@@ -7,13 +6,31 @@
   function initDb() {
     const existing = localStorage.getItem(STORAGE_KEY);
     if (existing) {
-      try { return JSON.parse(existing); } catch (e) {}
+      try {
+        const db = JSON.parse(existing);
+        const demoCustomers = [
+          { username: 'juan', password: 'customer123', full_name: 'Juan Dela Cruz', role: 'Customer', customer_id: 1, status: 'Active' },
+          { username: 'maria', password: 'customer123', full_name: 'Maria Clara', role: 'Customer', customer_id: 2, status: 'Active' }
+        ];
+        let changed = false;
+        for (const user of demoCustomers) {
+          if (!db.users.some(existingUser => existingUser.username.toLowerCase() === user.username)) {
+            const userId = Math.max(0, ...db.users.map(existingUser => Number(existingUser.user_id) || 0)) + 1;
+            db.users.push({ ...user, user_id: userId });
+            changed = true;
+          }
+        }
+        if (changed) saveDb(db);
+        return db;
+      } catch (e) {}
     }
     const seed = {
       users: [
         { user_id: 1, username: 'admin', password: 'admin123', full_name: 'System Administrator', role: 'Administrator', status: 'Active' },
         { user_id: 2, username: 'staff_anna', password: 'staff123', full_name: 'Anna Reyes', role: 'Staff', status: 'Active' },
-        { user_id: 3, username: 'staff_mark', password: 'staff123', full_name: 'Mark Santos', role: 'Staff', status: 'Active' }
+        { user_id: 3, username: 'staff_mark', password: 'staff123', full_name: 'Mark Santos', role: 'Staff', status: 'Active' },
+        { user_id: 4, username: 'juan', password: 'customer123', full_name: 'Juan Dela Cruz', role: 'Customer', customer_id: 1, status: 'Active' },
+        { user_id: 5, username: 'maria', password: 'customer123', full_name: 'Maria Clara', role: 'Customer', customer_id: 2, status: 'Active' }
       ],
       customers: [
         { customer_id: 1, customer_identity: 'CUST-0001', full_name: 'Juan Dela Cruz', phone: '09171234567', email: 'juan@gmail.com', address: '123 Main St, Manila' },
@@ -536,20 +553,14 @@
   // Universal API caller
   window.petshopApi = async function (path, method = 'GET', body, token) {
     const isStaticDeploy = location.hostname.endsWith('github.io') || location.protocol === 'file:';
-    const apiBase = String(window.PETSHOP_API_BASE_URL || '').replace(/\/+$/, '');
     const cleanPath = path.split('?')[0];
     const requiresSharedBackend = method === 'POST' &&
       ['/auth/signup', '/customer/appointments', '/public/appointments'].includes(cleanPath);
-    const sharedBackendError = 'This GitHub Pages site has no shared server, so the request was not saved. Start the app with "npm start" and open http://localhost:3000, or use your hosted backend URL.';
-    if (apiBase && token && token.startsWith('mock.')) {
-      localStorage.removeItem('tok');
-      localStorage.removeItem('me');
-      token = null;
-    }
-    if (isStaticDeploy && !apiBase && requiresSharedBackend) throw new Error(sharedBackendError);
-    if (!isStaticDeploy || apiBase) {
+    const sharedBackendError = 'This GitHub Pages demo cannot save new customer registrations or appointments. These actions need a shared application server.';
+    if (isStaticDeploy && requiresSharedBackend) throw new Error(sharedBackendError);
+    if (!isStaticDeploy) {
       try {
-        const response = await fetch((apiBase || '/api') + path, {
+        const response = await fetch('/api' + path, {
           method,
           headers: {
             'Content-Type': 'application/json',
@@ -568,12 +579,10 @@
           if (!response.ok) throw new Error(data.error || 'Request failed');
           return data;
         }
-        if (apiBase) throw new Error('The shared app server returned an unexpected response. Check the configured API URL.');
       } catch (err) {
         if (err.message && !err.message.includes('fetch') && !err.message.includes('NetworkError')) {
           throw err;
         }
-        if (apiBase) throw new Error('Unable to reach the shared app server. Please try again later.');
         if (requiresSharedBackend) throw new Error(sharedBackendError);
       }
     }
