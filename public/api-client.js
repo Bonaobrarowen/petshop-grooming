@@ -133,7 +133,7 @@
       if (db.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
         throw new Error('Username is already taken');
       }
-      const custId = db.customers.length + 1;
+      const custId = Math.max(0, ...db.customers.map(c => Number(c.customer_id) || 0)) + 1;
       const newCust = {
         customer_id: custId,
         customer_identity: `CUST-${String(custId).padStart(4, '0')}`,
@@ -143,7 +143,7 @@
         address: String(body.address || '').trim()
       };
       db.customers.push(newCust);
-      const newUserId = db.users.length + 1;
+      const newUserId = Math.max(0, ...db.users.map(u => Number(u.user_id) || 0)) + 1;
       const newUser = {
         user_id: newUserId,
         username,
