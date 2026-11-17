@@ -539,7 +539,7 @@
     const cleanPath = path.split('?')[0];
     const requiresSharedBackend = method === 'POST' &&
       ['/auth/signup', '/customer/appointments', '/public/appointments'].includes(cleanPath);
-    const sharedBackendError = 'Customer registration and appointment requests require the shared application server. This site is in static-only mode or the server is unavailable, so the request was not saved.';
+    const sharedBackendError = 'This GitHub Pages site has no shared server, so the request was not saved. Start the app with "npm start" and open http://localhost:3000, or use your hosted backend URL.';
     if (isStaticDeploy && requiresSharedBackend) throw new Error(sharedBackendError);
     if (!isStaticDeploy) {
       try {

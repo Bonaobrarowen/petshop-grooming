@@ -89,14 +89,14 @@ function renderAuth(isSignup=false){
       </p>
       <form id="auth-form">
         ${isSignup?`
-          <label>Full name<input name="fullName" placeholder="e.g. Juan Dela Cruz" required></label>
-          <label>Mobile number<input name="phone" placeholder="09XXXXXXXXX" pattern="09[0-9]{9}" maxlength="11" required></label>
-          <label>Email<input name="email" type="email" placeholder="name@example.com" required></label>
-          <label>Address (optional)<input name="address" placeholder="City or Street Address"></label>
+          <label>Full name<input name="fullName" autocomplete="name" placeholder="e.g. Juan Dela Cruz" required></label>
+          <label>Mobile number<input name="phone" autocomplete="tel" placeholder="09XXXXXXXXX" pattern="09[0-9]{9}" maxlength="11" required></label>
+          <label>Email<input name="email" type="email" autocomplete="email" placeholder="name@example.com" required></label>
+          <label>Address (optional)<input name="address" autocomplete="street-address" placeholder="City or Street Address"></label>
         `:''}
-        <label>Username<input name="username" placeholder="Username" required minlength="3"></label>
-        <label>Password<input name="password" type="password" placeholder="Password" required minlength="${isSignup?8:1}"></label>
-        ${isSignup?'<label>Confirm password<input name="confirm" type="password" placeholder="Re-type password" required minlength="8"></label>':''}
+        <label>Username<input name="username" autocomplete="username" placeholder="Username" required minlength="3"></label>
+        <label>Password<input name="password" type="password" autocomplete="${isSignup?'new-password':'current-password'}" placeholder="Password" required minlength="${isSignup?8:1}"></label>
+        ${isSignup?'<label>Confirm password<input name="confirm" type="password" autocomplete="new-password" placeholder="Re-type password" required minlength="8"></label>':''}
         <button>${isSignup?'Create account & log in':'Log in to Customer Portal'}</button>
         <div id="auth-msg"></div>
       </form>
@@ -176,8 +176,8 @@ async function renderPortal(){
       <section class="card">
         <h2>✂️ Book a Grooming Appointment Online</h2>
         <form id="booking-form">
-          <label>Full name<input name="full_name" required></label>
-          <label>Mobile number<input name="phone" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" required></label>
+          <label>Full name<input name="full_name" autocomplete="name" required></label>
+          <label>Mobile number<input name="phone" autocomplete="tel" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" required></label>
           <label class="full">Dog name<input name="pet_name" placeholder="Dog's name" required></label>
           <label>Breed<input name="breed" placeholder="e.g. Shih Tzu, Poodle, Golden Retriever" required></label>
           <label>Dog age (years)<input name="age" type="number" min="0" step="1" value="1" required></label>
@@ -197,8 +197,8 @@ async function renderPortal(){
           <label class="full">Preferred date and time
             <input name="appointment_date" type="datetime-local" required>
           </label>
-          <input type="hidden" name="email">
-          <input type="hidden" name="address">
+          <input type="hidden" name="email" autocomplete="email">
+          <input type="hidden" name="address" autocomplete="street-address">
           <button class="full" style="padding:12px;font-size:16px;margin-top:8px">Submit Grooming Appointment</button>
           <div class="full" id="booking-feedback"></div>
         </form>
