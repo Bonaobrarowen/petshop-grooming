@@ -28,5 +28,7 @@ exports.appointments = (q, s) => s.json(db.prepare(`
   FROM grooming_appointment a
   JOIN pet p ON p.pet_id=a.pet_id
   JOIN customer c ON c.customer_id=p.customer_id
-  ORDER BY a.appointment_date DESC, a.appointment_id DESC
+  ORDER BY CASE WHEN a.status='Pending' THEN 0 ELSE 1 END,
+    CASE WHEN a.status='Pending' THEN a.appointment_id END DESC,
+    a.appointment_date DESC, a.appointment_id DESC
 `).all());

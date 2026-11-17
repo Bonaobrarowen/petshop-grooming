@@ -18,7 +18,7 @@ exports.appointments = (q, s) => {
     FROM grooming_appointment a
     JOIN pet p ON p.pet_id=a.pet_id
     WHERE p.customer_id=?
-    ORDER BY a.appointment_date DESC
+    ORDER BY a.appointment_id DESC
   `).all(customerId);
   s.json(rows);
 };

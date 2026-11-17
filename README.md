@@ -66,7 +66,7 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
    - Public booking page: [http://localhost:3000/book.html](http://localhost:3000/book.html)
 4. Keep the terminal open while using the system. To stop the server, press **Ctrl+C** in that terminal.
 
-The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new empty database is initialized with sample records. Open the site through the server URL above; opening an HTML file directly does not provide the backend functions, including OTP email.
+The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new empty database is initialized with sample records. Open the site through the server URL above; opening an HTML file directly or deploying only to GitHub Pages does not provide the shared backend, including OTP email. Customer account registration and appointment requests are rejected in static-only mode rather than being saved only in one browser. Use the same running backend URL for the customer and staff/admin portals so all requests reach the shared database.
 
 ---
 
@@ -89,7 +89,7 @@ These are sample credentials. Change them before using a deployed system. The se
 - **Staff** can use POS, inventory, customers, pets, and grooming schedules. Staff can add products, add incoming stock to existing products, and register pending online appointments.
 - **Administrators** can do staff tasks, add Staff or Administrator accounts, manage recovery emails, create/restore backups, and delete records.
 - **Only Administrators** can delete customers. Deleting a customer also deletes their pets and grooming appointments, keeps sales history without its customer link, and deactivates any linked customer login. The confirmation dialog explains this before proceeding.
-- **Customers** can register an account with an email address, book grooming appointments, and view their appointment status in the customer portal.
+- **Customers** can register an account with a valid email address and a password of at least 8 characters, book grooming appointments, and view their appointment status in the customer portal. The newest appointment requests appear first.
 - New staff/admin accounts require a unique username and recovery email, a role, and a password of at least 8 characters. Existing accounts' recovery emails can be changed in **System users**.
 - The **System users** page shows separate sections for Staff, Administrator, and Customer accounts.
 

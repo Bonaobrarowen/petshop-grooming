@@ -107,6 +107,12 @@
     // Auth Signup
     if (cleanPath === '/auth/signup' && method === 'POST') {
       const username = String(body.username || '').trim();
+      const email = String(body.email || '').trim();
+      const password = String(body.password || '');
+      if (!String(body.fullName || '').trim() || !email || !username || !password) throw new Error('Full name, email, username, and password are required');
+      if (username.length < 3) throw new Error('Username must be at least 3 characters');
+      if (password.length < 8) throw new Error('Password must be at least 8 characters');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Enter a valid email address');
       if (db.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
         throw new Error('Username is already taken');
       }
@@ -116,7 +122,7 @@
         customer_identity: `CUST-${String(custId).padStart(4, '0')}`,
         full_name: String(body.fullName || '').trim(),
         phone: String(body.phone || '').trim(),
-        email: String(body.email || '').trim(),
+        email,
         address: String(body.address || '').trim()
       };
       db.customers.push(newCust);
@@ -124,7 +130,7 @@
       const newUser = {
         user_id: newUserId,
         username,
-        password: body.password,
+        password,
         full_name: newCust.full_name,
         role: 'Customer',
         customer_id: custId,
@@ -530,6 +536,11 @@
   // Universal API caller
   window.petshopApi = async function (path, method = 'GET', body, token) {
     const isStaticDeploy = location.hostname.endsWith('github.io') || location.protocol === 'file:';
+    const cleanPath = path.split('?')[0];
+    const requiresSharedBackend = method === 'POST' &&
+      ['/auth/signup', '/customer/appointments', '/public/appointments'].includes(cleanPath);
+    const sharedBackendError = 'Customer registration and appointment requests require the shared application server. This site is in static-only mode or the server is unavailable, so the request was not saved.';
+    if (isStaticDeploy && requiresSharedBackend) throw new Error(sharedBackendError);
     if (!isStaticDeploy) {
       try {
         const response = await fetch('/api' + path, {
@@ -555,8 +566,10 @@
         if (err.message && !err.message.includes('fetch') && !err.message.includes('NetworkError')) {
           throw err;
         }
+        if (requiresSharedBackend) throw new Error(sharedBackendError);
       }
     }
+    if (requiresSharedBackend) throw new Error(sharedBackendError);
     // Fallback to in-browser storage (GitHub Pages)
     return await clientDb(path, method, body, token);
   };
