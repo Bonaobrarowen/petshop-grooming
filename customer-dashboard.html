@@ -83,10 +83,7 @@ function renderAuth(isSignup=false){
   $('#app').innerHTML=`
     <div class="auth-shell">
       <h1>Pet Shop Grooming</h1>
-      <h2>${isSignup?'Create Customer Account':'Customer Portal Login'}</h2>
-      <p style="font-size:13px;color:var(--muted);text-align:center;margin-top:-10px">
-        Log in to view your appointments and book a grooming schedule online.
-      </p>
+      <h2>${isSignup?'Create Customer Account':'Sign In'}</h2>
       <form id="auth-form">
         ${isSignup?`
           <label>Full name<input name="fullName" autocomplete="name" placeholder="e.g. Juan Dela Cruz" required></label>
