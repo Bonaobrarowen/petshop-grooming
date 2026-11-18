@@ -8,13 +8,6 @@ CREATE TABLE IF NOT EXISTS user_account (
   customer_id INTEGER REFERENCES customer(customer_id),
   status TEXT NOT NULL DEFAULT 'Active'
 );
-CREATE TABLE IF NOT EXISTS password_reset_otp (
-  user_id INTEGER PRIMARY KEY REFERENCES user_account(user_id) ON DELETE CASCADE,
-  otp_hash TEXT NOT NULL,
-  expires_at INTEGER NOT NULL,
-  attempts INTEGER NOT NULL DEFAULT 0,
-  last_sent_at INTEGER NOT NULL
-);
 CREATE TABLE IF NOT EXISTS customer (
   customer_id INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_identity TEXT NOT NULL UNIQUE,

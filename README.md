@@ -28,24 +28,17 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
    ```powershell
    Copy-Item .env.example .env
    ```
-   Set a private JWT secret and configure SMTP for password-reset emails. For example:
+   Set a private JWT secret. Email-based password recovery is disabled.
    ```env
    PORT=3000
    JWT_SECRET=replace-with-a-private-random-secret
    LOW_STOCK_DEFAULT=5
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_SECURE=false
-   SMTP_USER=your-email@gmail.com
-   SMTP_PASS=your-email-app-password
-   SMTP_FROM="Pet Shop Grooming <your-email@gmail.com>"
-   OTP_SECRET=replace-with-a-private-random-secret-at-least-32-characters-long
    ```
-   Generate a random secret for `OTP_SECRET` with:
+   Generate a random JWT secret with:
    ```powershell
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
-   `OTP_SECRET` must be at least 32 characters. For Gmail, use an App Password (not your regular account password). Keep `.env` private and restart the server after changing it. SMTP settings are required for password-reset email; without them, the rest of the system can still run but email recovery is unavailable.
+   Keep `.env` private and restart the server after changing it.
 
 4. **Optional: load sample data** on a new/test database:
    ```powershell
@@ -66,23 +59,11 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
    - Public booking page: [http://localhost:3000/book.html](http://localhost:3000/book.html)
 4. Keep the terminal open while using the system. To stop the server, press **Ctrl+C** in that terminal.
 
-The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new local database is initialized with sample records. Customers still register and request appointments through the website; the shared API is the server-side part that saves those actions to one database, so the admin can see them and manage them. GitHub Pages hosts only the website files and cannot itself store records for everyone.
+The local Node server stores records in `database/petshop.db`. GitHub Pages runs the browser-local demo and stores its records in that browser's local storage.
 
 ## GitHub Pages demo
 
-Open the site at `https://bonaobrarowen.github.io/petshop-grooming/`. The GitHub Pages site uses the API URL in `public/api-config.js` for app data. Customer registrations and appointment requests are saved to the shared server database when the API is deployed with persistent storage and CORS allows `https://bonaobrarowen.github.io`. Until then, Pages cannot save shared registrations or appointments. Do not enter real customer information until the backend deployment and its storage are verified.
-
-### Deploy the shared API on Render
-
-The root `render.yaml` Blueprint creates the Node API service at `https://petshop-grooming.onrender.com`, matching `public/api-config.js`. It configures the GitHub Pages CORS origin, generated JWT and OTP secrets, and a persistent 1 GB disk for the SQLite database, logs, and backups. Render requires a paid web-service plan for persistent disks; review the current charges before provisioning.
-
-1. In Render, create a new **Blueprint Instance** from this repository and review the service and disk before confirming.
-2. When prompted, set `ADMIN_PASSWORD` to a unique password of at least 8 characters and keep it private. The first production database starts with only the `admin` account using this password; it does not load sample/demo accounts or data. Sign in as admin and add your own staff accounts in **System users**.
-3. Wait for the service deployment to complete. Confirm `https://petshop-grooming.onrender.com/` loads the app before using the GitHub Pages site.
-
-The API host in `public/api-config.js` must match the service's Render URL. If Render assigns a different URL, update the API config files used by the static deployment. The local Node server continues to use the sample accounts and local SQLite database.
-
-Before creating the Blueprint, push the deployment files (including `render.yaml` and `package-lock.json`) to the GitHub repository connected to Render. Publish the matching static-site changes to GitHub Pages as well. The Pages site cannot reach a backend until the Render service is deployed and its URL is responding.
+Open the site at `https://bonaobrarowen.github.io/petshop-grooming/`. Customer signup and appointment booking work in the demo and are saved only in the current browser. They are not shared with staff on another device or browser. Use `npm start` and the local Node server when you need records stored in a shared database on that computer.
 
 ---
 
@@ -94,27 +75,18 @@ Before creating the Blueprint, push the deployment files (including `render.yaml
 | `staff_anna` | `staff123` | Staff | Access to POS, inventory, customers, pets, and grooming schedules |
 | `staff_mark` | `staff123` | Staff | Access to POS, inventory, customers, pets, and grooming schedules |
 
-*On a server deployment, new customers can register through **Create an account** or sign in to access the customer portal. GitHub Pages sends registrations to its configured shared API; this requires the API deployment and CORS configuration described above.*
+*On GitHub Pages, new customers can register through **Create an account** and sign in to the customer portal. Demo accounts and new records are browser-local.*
 
-These are sample credentials for the local demo. On GitHub Pages, they only sign in to browser-local demo data and are not secure production accounts. The seeded staff and administrator accounts do not have recovery emails; an administrator must set their recovery emails in **System users** before those accounts can use OTP recovery on a server deployment.
-The Render deployment does not create these sample accounts. Its initial administrator username is `admin`, and its password is the private `ADMIN_PASSWORD` entered during Blueprint setup.
+These are sample credentials for the local demo. On GitHub Pages, changes are stored only in that browser and are not secure production records.
 
 ## Accounts and permissions
 
 - **Staff** can use POS, inventory, customers, pets, and grooming schedules. Staff can add products, add incoming stock to existing products, and register pending online appointments.
-- **Administrators** can do staff tasks, add Staff or Administrator accounts, manage recovery emails, create/restore backups, and delete records.
+- **Administrators** can do staff tasks, add Staff or Administrator accounts, create/restore backups, and delete records.
 - **Only Administrators** can delete customers. Deleting a customer also deletes their pets and grooming appointments, keeps sales history without its customer link, and deactivates any linked customer login. The confirmation dialog explains this before proceeding.
-- **Customers** can register an account with a valid email address and a password of at least 8 characters, book grooming appointments, and view their appointment status in a server deployment. The newest appointment requests appear first.
-- New staff/admin accounts require a unique username and recovery email, a role, and a password of at least 8 characters. Existing accounts' recovery emails can be changed in **System users**.
+- **Customers** can register an account with a valid email address and a password of at least 8 characters, book grooming appointments, and view their appointment status. On GitHub Pages, this data is saved in the current browser only.
+- New staff/admin accounts require a unique username, a role, and a password of at least 8 characters.
 - The **System users** page shows separate sections for Staff, Administrator, and Customer accounts.
-
-### Forgot password / OTP
-
-1. On the login page, select **Forgot password?** and enter the account username.
-2. If the account is active and has a registered recovery email, the system sends a six-digit OTP to that email.
-3. Enter the OTP and a new password of at least 8 characters.
-
-OTP codes expire after 10 minutes, can only be used once, and allow up to five verification attempts. Requests are limited to one email per account per minute. The system stores a hash of the OTP rather than the code itself. The application must be running with valid SMTP settings and an `OTP_SECRET`; configure these in `.env` as described above. Staff/admin accounts use their saved recovery email. Customer accounts use the email saved on their customer profile unless an administrator has set an account-specific recovery email.
 
 ---
 
@@ -146,9 +118,8 @@ OTP codes expire after 10 minutes, can only be used once, and allow up to five v
 - Added stock is summed with the current quantity; it does not replace existing stock. Only positive whole-number quantities are accepted.
 
 ### 5. Account and customer management
-- Administrators can create Staff and Administrator accounts and set or update their recovery emails from **System users**.
+- Administrators can create Staff and Administrator accounts from **System users**.
 - Customer deletion uses the customer's database ID and is restricted to administrators. The confirmation describes related records affected by deletion.
-- The login page supports email-based OTP password recovery when SMTP is configured.
 
 ### 6. Scrollable Database Backup & Recovery Audit Trail
 - System and error trails are available to administrators, with a refresh control.
@@ -188,9 +159,8 @@ OTP codes expire after 10 minutes, can only be used once, and allow up to five v
 - Customer deletion is administrator-only and removes linked pets and grooming appointments; sales history is retained with the customer association cleared.
 
 ### User Accounts
-- Administrators create Staff or Administrator accounts in **System users** and can update each account's recovery email.
+- Administrators create Staff or Administrator accounts in **System users**.
 - Staff can add products and register pending online appointments; only administrators can manage users, backups, and deletions.
-- **Forgot password** emails a time-limited OTP to the account's recovery email. SMTP and `OTP_SECRET` must be configured in `.env`.
 
 ### Grooming Appointments
 - Supports walk-in bookings and customer online booking.

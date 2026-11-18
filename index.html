@@ -32,7 +32,6 @@
   </style>
 </head>
 <body><div id="root"></div>
-<script src="api-config.js"></script>
 <script src="api-client.js"></script>
 <script>
 let token=localStorage.getItem('tok'),user=JSON.parse(localStorage.getItem('me')||'null'),main=null,current=null,cart=[];
@@ -66,7 +65,7 @@ const definitions={
   products:{title:'Inventory Management',columns:['product_id','name','category','price','stock_quantity','reorder_level','barcode'],fields:[['name','Product name'],['category','Category','select',['Food','Grooming','Accessories','Treats','Health & Care','Toys','Cleaning & Hygiene','Pet Supplies']],['price','Price','number'],['stock_quantity','Stock','number'],['reorder_level','Reorder level','number'],['barcode','Barcode']]},
   appointments:{title:'Grooming schedules',columns:['appointment_id','pet_id','pet_name','owner_customer_id','owner_name','owner_phone','service','appointment_date','price','status'],fields:[['pet_id','Pet'],['service','Service'],['appointment_date','Date and time','datetime-local'],['price','Price','number']]},
   pickups:{title:'Pet pickup verification',columns:['pickup_id','pet_id','person_name','relationship','contact','id_presented','authorization_status','released_at','appointment_id'],fields:[['pet_id','Pet ID','number'],['person_name','Authorized person'],['relationship','Relationship'],['contact','Contact number'],['id_presented','ID presented?','number'],['authorization_status','Verification status']]},
-  users:{title:'System users',columns:['user_id','username','full_name','role','status'],fields:[['username','Username'],['full_name','Full name'],['email','Recovery email','email'],['password','Password (8+ characters)','password'],['role','Role','select',['Staff','Administrator']],['status','Status','select',['Active','Inactive']]]}
+  users:{title:'System users',columns:['user_id','username','full_name','role','status'],fields:[['username','Username'],['full_name','Full name'],['password','Password (8+ characters)','password'],['role','Role','select',['Staff','Administrator']],['status','Status','select',['Active','Inactive']]]}
 };
 async function dashboard(){
   clearInterval(window.dashboardClock);const d=await api('/dashboard');
@@ -144,7 +143,6 @@ function actions(key,item){
     if(status==='Pending')html+=`<button class="small register" data-action="register-appointment" data-id="${id}" title="Register this schedule into the system in 1 push">Register</button> `;
     if(status==='Scheduled')html+=`<button class="small register" data-action="complete-appointment" data-id="${id}">Done</button> `;
   }
-  if(key=='users')html+=`<label>Recovery email<input type="email" value="${esc(item.email||'')}" data-user-email="${id}" required></label><button class="small" data-save-user-email="${id}">Save email</button> `;
   if(user.role=='Administrator')html+=`<button class="small delete" data-delete="${id}">Delete</button>`;
   return html;
 }
@@ -250,13 +248,6 @@ async function go(key){
   try{({dashboard,low:lowStock,pos,sales:salesHistory,backup}[key]?await ({dashboard,low:lowStock,pos,sales:salesHistory,backup}[key])():await section(key))}catch(error){main.innerHTML=`<div class="alert error">${esc(error.message)}</div>`}
 }
 document.addEventListener('click',async e=>{
-  const saveUserEmail=e.target.closest('[data-save-user-email]');
-  if(saveUserEmail){
-    const id=saveUserEmail.dataset.saveUserEmail,email=main.querySelector(`[data-user-email="${id}"]`).value;
-    saveUserEmail.disabled=true;
-    try{await api(`/users/${id}`,'PUT',{email});await go(current)}
-    catch(error){alert(error.message);saveUserEmail.disabled=false}
-  }
   const restockButton=e.target.closest('[data-restock]');
   if(restockButton){
     const id=restockButton.dataset.restock,quantity=main.querySelector(`[data-restock-quantity="${id}"]`).value;
@@ -265,9 +256,9 @@ document.addEventListener('click',async e=>{
     catch(error){alert(error.message);restockButton.disabled=false}
   }
   const deleteButton=e.target.closest('[data-delete]');
-  if(deleteButton&&confirm(current=='customers'?'Delete this customer? Their pets and grooming appointments will also be deleted, sales history will be kept without the customer link, and their customer login will be deactivated.':'Delete this record?')){
+  if(deleteButton&&confirm(current=='customers'?'Delete this customer? Their pets and grooming appointments will also be deleted, sales history will be kept without the customer link, and their customer login will be deactivated.':current=='users'?'Delete this account? Accounts with historical records will be deactivated to preserve audit history.':'Delete this record?')){
     deleteButton.disabled=true;
-    try{await api('/'+current+'/'+deleteButton.dataset.delete,'DELETE');await go(current)}
+    try{const result=await api('/'+current+'/'+deleteButton.dataset.delete,'DELETE');if(result.message)alert(result.message);await go(current)}
     catch(error){alert(error.message);deleteButton.disabled=false}
   }
   const action=e.target.closest('[data-action]');
@@ -288,31 +279,10 @@ document.addEventListener('click',async e=>{
 });
 function start(){
   if(!token){
-    let signup=false,recoveryStep=0,recoveryUsername='',loginNotice='';
+    let signup=false;
     const render=()=>{
-      if(recoveryStep){
-        $('#root').innerHTML=`<div class="auth-shell"><div class="login-card"><h1>Pet Shop Grooming</h1><h2>Forgot password</h2><form id="recovery-form">${recoveryStep==1?'<label>Username<input name="username" required autocomplete="username"></label><button>Send OTP</button>':'<p>Enter the 6-digit code sent to your registered email and choose a new password.</p><label>OTP<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"></label><label>New password<input name="password" type="password" minlength="8" required autocomplete="new-password"></label><button>Reset password</button>'}<div id="auth-feedback"></div></form><div class="switch"><a id="back-login">Back to login</a></div></div></div>`;
-        $('#back-login').onclick=()=>{recoveryStep=0;loginNotice='';render()};
-        $('#recovery-form').onsubmit=async event=>{
-          event.preventDefault();const form=new FormData(event.target);
-          try{
-            if(recoveryStep==1){
-              recoveryUsername=String(form.get('username')).trim();
-              const result=await api('/auth/password-reset/request','POST',{username:recoveryUsername});
-              recoveryStep=2;render();
-              $('#auth-feedback').innerHTML=`<div class="alert success">${esc(result.message)} If no code arrives, contact the administrator to check your recovery email.</div>`;
-            }else{
-              const result=await api('/auth/password-reset/complete','POST',{username:recoveryUsername,code:form.get('code'),password:form.get('password')});
-              recoveryStep=0;loginNotice=result.message;render();
-              $('#auth-feedback').innerHTML=`<div class="alert success">${esc(loginNotice)}</div>`;
-            }
-          }catch(error){$('#auth-feedback').innerHTML=`<div class="alert error">${esc(error.message)}</div>`}
-        };
-        return;
-      }
-      $('#root').innerHTML=`<div class="auth-shell"><div class="login-card"><h1>Pet Shop Grooming</h1>${signup?`<h2>Customer Registration</h2>`:``}<form id="auth">${signup?'<label>Full name<input name="fullName" autocomplete="name" required></label><label>Mobile number<input name="phone" autocomplete="tel" required pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX"></label><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Address (optional)<input name="address" autocomplete="street-address"></label>':''}<label>Username<input name="username" autocomplete="username" required minlength="3"></label><label>Password<input name="password" type="password" autocomplete="${signup?'new-password':'current-password'}" required minlength="${signup?8:1}"></label>${signup?' <label>Confirm password<input name="confirm" type="password" autocomplete="new-password" required minlength="8"></label>':''}<button>${signup?'Create customer account & sign in':'Login'}</button><div id="auth-feedback">${loginNotice?`<div class="alert success">${esc(loginNotice)}</div>`:''}</div></form><div class="switch">${signup?'Already have an account?':'New customer?'} <a id="switch">${signup?'Login here':'Create an account'}</a>${signup?'':' &middot; <a id="forgot">Forgot password?</a>'}</div></div></div>`;
+      $('#root').innerHTML=`<div class="auth-shell"><div class="login-card"><h1>Pet Shop Grooming</h1>${signup?`<h2>Customer Registration</h2>`:``}<form id="auth">${signup?'<label>Full name<input name="fullName" autocomplete="name" required></label><label>Mobile number<input name="phone" autocomplete="tel" required pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX"></label><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Address (optional)<input name="address" autocomplete="street-address"></label>':''}<label>Username<input name="username" autocomplete="username" required minlength="3"></label><label>Password<input name="password" type="password" autocomplete="${signup?'new-password':'current-password'}" required minlength="${signup?8:1}"></label>${signup?' <label>Confirm password<input name="confirm" type="password" autocomplete="new-password" required minlength="8"></label>':''}<button>${signup?'Create customer account & sign in':'Login'}</button><div id="auth-feedback"></div></form><div class="switch">${signup?'Already have an account?':'New customer?'} <a id="switch">${signup?'Login here':'Create an account'}</a></div></div></div>`;
       $('#switch').onclick=()=>{signup=!signup;render()};
-      if(!signup)$('#forgot').onclick=()=>{recoveryStep=1;loginNotice='';render()};
       $('#auth').onsubmit=async event=>{event.preventDefault();const form=new FormData(event.target);if(signup&&form.get('password')!=form.get('confirm')){$('#auth-feedback').innerHTML='<div class="alert error">Passwords do not match</div>';return}
         try{const data=await api(signup?'/auth/signup':'/auth/login','POST',signup?{fullName:form.get('fullName'),phone:form.get('phone'),email:form.get('email'),address:form.get('address'),username:form.get('username'),password:form.get('password')}:{username:form.get('username'),password:form.get('password')});token=data.token;user=data.user;localStorage.setItem('tok',token);localStorage.setItem('me',JSON.stringify(user));if(user.role=='Customer'){location.href='customer-dashboard.html';return}start()}catch(error){$('#auth-feedback').innerHTML=`<div class="alert error">${esc(error.message)}</div>`}
       };

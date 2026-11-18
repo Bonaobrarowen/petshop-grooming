@@ -1,7 +1,6 @@
 require('dotenv').config();
 const Database = require('better-sqlite3'), fs = require('fs'), path = require('path'), bcrypt = require('bcryptjs');
-const file = process.env.DATABASE_PATH || path.join(__dirname, '..', 'database', 'petshop.db');
-fs.mkdirSync(path.dirname(file), { recursive: true });
+const file = path.join(__dirname, '..', 'database', 'petshop.db');
 if (fs.existsSync(file + '.restore')) fs.renameSync(file + '.restore', file); // staged restore
 const db = new Database(file);
 db.pragma('foreign_keys = ON');
@@ -80,16 +79,11 @@ if (petColumns.some(c => c.name === 'pet_code')) {
   }
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS pet_code_unique ON pet(pet_code)');
 }
-if (!db.prepare('SELECT 1 FROM user_account').get()) {
-  const isProduction = process.env.NODE_ENV === 'production';
-  const initialAdminPassword = process.env.ADMIN_PASSWORD || (isProduction ? '' : 'admin123');
-  if (initialAdminPassword.length < 8) {
-    throw new Error('Set ADMIN_PASSWORD to at least 8 characters before starting with an empty production database');
-  }
+if (!db.prepare('SELECT 1 FROM user_account').get()) { // seed default admin
   db.prepare('INSERT INTO user_account(username,password_hash,full_name,role) VALUES (?,?,?,?)')
-    .run('admin', bcrypt.hashSync(initialAdminPassword, 10), 'System Administrator', 'Administrator');
+    .run('admin', bcrypt.hashSync('admin123', 10), 'System Administrator', 'Administrator');
 }
-if (process.env.NODE_ENV !== 'production' && !db.prepare('SELECT 1 FROM product_inventory').get()) {
+if (!db.prepare('SELECT 1 FROM product_inventory').get()) {
   try {
     require('../database/seed');
   } catch (err) {

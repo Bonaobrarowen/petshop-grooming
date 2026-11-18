@@ -104,10 +104,6 @@
     const db = initDb();
     const currentUser = getUserFromToken(token);
     const cleanPath = path.split('?')[0];
-    if (cleanPath.startsWith('/auth/password-reset/')) {
-      throw new Error('Password recovery requires the application server and configured SMTP email.');
-    }
-
     // Auth Login
     if (cleanPath === '/auth/login' && method === 'POST') {
       const u = db.users.find(x => x.username.toLowerCase() === String(body.username || '').toLowerCase());
@@ -553,16 +549,13 @@
   // Universal API caller
   window.petshopApi = async function (path, method = 'GET', body, token) {
     const isStaticDeploy = location.hostname.endsWith('github.io') || location.protocol === 'file:';
-    const apiBase = (window.PETSHOP_API_BASE_URL || '').replace(/\/$/, '');
     const cleanPath = path.split('?')[0];
     const requiresSharedBackend = method === 'POST' &&
       ['/auth/signup', '/customer/appointments', '/public/appointments'].includes(cleanPath);
-    const sharedBackendError = 'Customer registration and appointment booking require the shared app server. Please try again later.';
-    if (isStaticDeploy && !apiBase && requiresSharedBackend) throw new Error(sharedBackendError);
-    if (!isStaticDeploy || apiBase) {
+    const sharedBackendError = 'Customer registration and appointment booking require the local server. Start it and try again.';
+    if (!isStaticDeploy) {
       try {
-        const url = apiBase ? apiBase + path : '/api' + path;
-        const response = await fetch(url, {
+        const response = await fetch('/api' + path, {
           method,
           headers: {
             'Content-Type': 'application/json',
@@ -581,16 +574,14 @@
           if (!response.ok) throw new Error(data.error || 'Request failed');
           return data;
         }
-        if (apiBase) throw new Error('The shared app server returned an unexpected response. Check the configured API URL.');
       } catch (err) {
         if (err.message && !err.message.includes('fetch') && !err.message.includes('NetworkError')) {
           throw err;
         }
-        if (apiBase) throw new Error('Unable to reach the shared app server. Please try again later.');
         if (requiresSharedBackend) throw new Error(sharedBackendError);
       }
     }
-    if (requiresSharedBackend) throw new Error(sharedBackendError);
+    if (!isStaticDeploy && requiresSharedBackend) throw new Error(sharedBackendError);
     // Fallback to in-browser storage (GitHub Pages)
     return await clientDb(path, method, body, token);
   };

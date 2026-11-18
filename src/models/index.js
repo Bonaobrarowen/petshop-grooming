@@ -1,15 +1,15 @@
 const make = require('./model');
 const { db } = require('../../config/database');
-const User = make('user_account', 'user_id', ['username', 'password_hash', 'full_name', 'email', 'role', 'customer_id', 'status']);
+const User = make('user_account', 'user_id', ['username', 'password_hash', 'full_name', 'role', 'customer_id', 'status']);
 User.all = () => db.prepare(`
-  SELECT u.user_id,u.username,u.full_name,COALESCE(NULLIF(u.email,''),c.email,'') AS email,u.role,u.status
-  FROM user_account u LEFT JOIN customer c ON c.customer_id=u.customer_id
-  ORDER BY u.user_id
+  SELECT user_id,username,full_name,role,status
+  FROM user_account
+  ORDER BY user_id
 `).all();
 User.get = id => db.prepare(`
-  SELECT u.user_id,u.username,u.full_name,COALESCE(NULLIF(u.email,''),c.email,'') AS email,u.role,u.status
-  FROM user_account u LEFT JOIN customer c ON c.customer_id=u.customer_id
-  WHERE u.user_id=?
+  SELECT user_id,username,full_name,role,status
+  FROM user_account
+  WHERE user_id=?
 `).get(id);
 User.byName = u => db.prepare('SELECT * FROM user_account WHERE username=?').get(u);
 module.exports = {
