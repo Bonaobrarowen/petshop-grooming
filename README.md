@@ -66,11 +66,23 @@ A Node.js, Express, and SQLite system for managing customers, pets, inventory, g
    - Public booking page: [http://localhost:3000/book.html](http://localhost:3000/book.html)
 4. Keep the terminal open while using the system. To stop the server, press **Ctrl+C** in that terminal.
 
-The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new local database is initialized with sample records. GitHub Pages is static-only, so the public site runs in demo mode: demo accounts and changes are stored only in that browser. New customer signup and appointment requests are blocked because they cannot be shared with staff/admin without a backend server. Use the local Node server described above for shared registrations and appointments.
+The server creates or updates the SQLite database at `database/petshop.db` when it starts. A new local database is initialized with sample records. Customers still register and request appointments through the website; the shared API is the server-side part that saves those actions to one database, so the admin can see them and manage them. GitHub Pages hosts only the website files and cannot itself store records for everyone.
 
 ## GitHub Pages demo
 
-Open the site at `https://bonaobrarowen.github.io/petshop-grooming/`. The demo login data is stored in the browser and is not connected to the local SQLite database. Do not enter real customer information or treat demo logins, inventory changes, or appointments as real records. New customer registration and appointment submissions are unavailable on GitHub Pages.
+Open the site at `https://bonaobrarowen.github.io/petshop-grooming/`. The GitHub Pages site uses the API URL in `public/api-config.js` for app data. Customer registrations and appointment requests are saved to the shared server database when the API is deployed with persistent storage and CORS allows `https://bonaobrarowen.github.io`. Until then, Pages cannot save shared registrations or appointments. Do not enter real customer information until the backend deployment and its storage are verified.
+
+### Deploy the shared API on Render
+
+The root `render.yaml` Blueprint creates the Node API service at `https://petshop-grooming.onrender.com`, matching `public/api-config.js`. It configures the GitHub Pages CORS origin, generated JWT and OTP secrets, and a persistent 1 GB disk for the SQLite database, logs, and backups. Render requires a paid web-service plan for persistent disks; review the current charges before provisioning.
+
+1. In Render, create a new **Blueprint Instance** from this repository and review the service and disk before confirming.
+2. When prompted, set `ADMIN_PASSWORD` to a unique password of at least 8 characters and keep it private. The first production database starts with only the `admin` account using this password; it does not load sample/demo accounts or data. Sign in as admin and add your own staff accounts in **System users**.
+3. Wait for the service deployment to complete. Confirm `https://petshop-grooming.onrender.com/` loads the app before using the GitHub Pages site.
+
+The API host in `public/api-config.js` must match the service's Render URL. If Render assigns a different URL, update the API config files used by the static deployment. The local Node server continues to use the sample accounts and local SQLite database.
+
+Before creating the Blueprint, push the deployment files (including `render.yaml` and `package-lock.json`) to the GitHub repository connected to Render. Publish the matching static-site changes to GitHub Pages as well. The Pages site cannot reach a backend until the Render service is deployed and its URL is responding.
 
 ---
 
@@ -81,12 +93,11 @@ Open the site at `https://bonaobrarowen.github.io/petshop-grooming/`. The demo l
 | `admin` | `admin123` | Administrator | Full access to users, backups, audit trails, and deletion |
 | `staff_anna` | `staff123` | Staff | Access to POS, inventory, customers, pets, and grooming schedules |
 | `staff_mark` | `staff123` | Staff | Access to POS, inventory, customers, pets, and grooming schedules |
-| `juan` | `customer123` | Customer | Sample customer portal account |
-| `maria` | `customer123` | Customer | Sample customer portal account |
 
-*On a server deployment, new customers can register through **Create an account** or sign in to access the customer portal. GitHub Pages demo mode does not support new customer registration.*
+*On a server deployment, new customers can register through **Create an account** or sign in to access the customer portal. GitHub Pages sends registrations to its configured shared API; this requires the API deployment and CORS configuration described above.*
 
 These are sample credentials for the local demo. On GitHub Pages, they only sign in to browser-local demo data and are not secure production accounts. The seeded staff and administrator accounts do not have recovery emails; an administrator must set their recovery emails in **System users** before those accounts can use OTP recovery on a server deployment.
+The Render deployment does not create these sample accounts. Its initial administrator username is `admin`, and its password is the private `ADMIN_PASSWORD` entered during Blueprint setup.
 
 ## Accounts and permissions
 

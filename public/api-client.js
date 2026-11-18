@@ -553,14 +553,16 @@
   // Universal API caller
   window.petshopApi = async function (path, method = 'GET', body, token) {
     const isStaticDeploy = location.hostname.endsWith('github.io') || location.protocol === 'file:';
+    const apiBase = (window.PETSHOP_API_BASE_URL || '').replace(/\/$/, '');
     const cleanPath = path.split('?')[0];
     const requiresSharedBackend = method === 'POST' &&
       ['/auth/signup', '/customer/appointments', '/public/appointments'].includes(cleanPath);
-    const sharedBackendError = 'This GitHub Pages demo cannot save new customer registrations or appointments. These actions need a shared application server.';
-    if (isStaticDeploy && requiresSharedBackend) throw new Error(sharedBackendError);
-    if (!isStaticDeploy) {
+    const sharedBackendError = 'Customer registration and appointment booking require the shared app server. Please try again later.';
+    if (isStaticDeploy && !apiBase && requiresSharedBackend) throw new Error(sharedBackendError);
+    if (!isStaticDeploy || apiBase) {
       try {
-        const response = await fetch('/api' + path, {
+        const url = apiBase ? apiBase + path : '/api' + path;
+        const response = await fetch(url, {
           method,
           headers: {
             'Content-Type': 'application/json',
@@ -579,10 +581,12 @@
           if (!response.ok) throw new Error(data.error || 'Request failed');
           return data;
         }
+        if (apiBase) throw new Error('The shared app server returned an unexpected response. Check the configured API URL.');
       } catch (err) {
         if (err.message && !err.message.includes('fetch') && !err.message.includes('NetworkError')) {
           throw err;
         }
+        if (apiBase) throw new Error('Unable to reach the shared app server. Please try again later.');
         if (requiresSharedBackend) throw new Error(sharedBackendError);
       }
     }

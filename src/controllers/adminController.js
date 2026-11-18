@@ -1,6 +1,7 @@
 const fs = require('fs'), path = require('path');
 const { db, file } = require('../../config/database'), app = require('../../config/app_config'), { bad } = require('../middleware/auth');
-const dir = path.join(__dirname, '..', '..', 'database', 'backups');
+const dir = path.resolve(process.env.BACKUP_DIR || path.join(__dirname, '..', '..', 'database', 'backups'));
+fs.mkdirSync(dir, { recursive: true });
 exports.backup = async (q, s) => {
   const f = `backup-${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
   await db.backup(path.join(dir, f)); app.log(`Backup ${f} by ${q.user.name}`); s.json({ file: f });
