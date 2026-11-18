@@ -2,23 +2,63 @@
 
 (function () {
   const STORAGE_KEY = 'petshop_local_db_v1';
+  const REMOVED_DEMO_CUSTOMERS_MIGRATION = 'removed_maria_juan_demo_customers_v1';
+  const DEMO_CUSTOMER_NAMES = { juan: 'juan dela cruz', maria: 'maria clara' };
+
+  function nextId(records, field) {
+    return Math.max(0, ...records.map(record => Number(record[field]) || 0)) + 1;
+  }
+
+  function removeCustomerRecords(db, customerIds) {
+    const ids = new Set(customerIds.map(Number));
+    const petIds = new Set(db.pets.filter(p => ids.has(Number(p.customer_id))).map(p => Number(p.pet_id)));
+    db.appointments = db.appointments.filter(a => !petIds.has(Number(a.pet_id)));
+    db.pickups = db.pickups.filter(p => !petIds.has(Number(p.pet_id)));
+    db.pets = db.pets.filter(p => !ids.has(Number(p.customer_id)));
+    db.customers = db.customers.filter(c => !ids.has(Number(c.customer_id)));
+    for (const sale of db.sales) {
+      if (ids.has(Number(sale.customer_id)) || Object.values(DEMO_CUSTOMER_NAMES).includes(String(sale.customer || '').trim().toLowerCase())) {
+        sale.customer_id = null;
+        sale.customer = 'Walk-in';
+        sale.customer_phone = '';
+        sale.customer_pets = '';
+      }
+    }
+  }
+
+  function removeDemoCustomerAccounts(db) {
+    const demoUsers = db.users.filter(u =>
+      u.role === 'Customer' && DEMO_CUSTOMER_NAMES[String(u.username || '').trim().toLowerCase()] === String(u.full_name || '').trim().toLowerCase()
+    );
+    const removedUserIds = new Set(demoUsers.map(u => Number(u.user_id)));
+    const customerIds = new Set(demoUsers
+      .map(u => u.customer_id)
+      .filter(id => id !== undefined && id !== null)
+      .map(Number)
+      .filter(Number.isFinite));
+    for (const customer of db.customers) {
+      if (Object.values(DEMO_CUSTOMER_NAMES).includes(String(customer.full_name || '').trim().toLowerCase())) {
+        const id = Number(customer.customer_id);
+        if (Number.isFinite(id)) customerIds.add(id);
+      }
+    }
+
+    db.users = db.users.filter(u => !removedUserIds.has(Number(u.user_id)));
+    removeCustomerRecords(db, [...customerIds]);
+
+    return removedUserIds.size > 0 || customerIds.size > 0;
+  }
 
   function initDb() {
     const existing = localStorage.getItem(STORAGE_KEY);
     if (existing) {
       try {
         const db = JSON.parse(existing);
-        const demoCustomers = [
-          { username: 'juan', password: 'customer123', full_name: 'Juan Dela Cruz', role: 'Customer', customer_id: 1, status: 'Active' },
-          { username: 'maria', password: 'customer123', full_name: 'Maria Clara', role: 'Customer', customer_id: 2, status: 'Active' }
-        ];
         let changed = false;
-        for (const user of demoCustomers) {
-          if (!db.users.some(existingUser => existingUser.username.toLowerCase() === user.username)) {
-            const userId = Math.max(0, ...db.users.map(existingUser => Number(existingUser.user_id) || 0)) + 1;
-            db.users.push({ ...user, user_id: userId });
-            changed = true;
-          }
+        if (!db.migrations?.[REMOVED_DEMO_CUSTOMERS_MIGRATION]) {
+          if (removeDemoCustomerAccounts(db)) addLog(db, 'Removed demo customer accounts: juan and maria');
+          db.migrations = { ...(db.migrations || {}), [REMOVED_DEMO_CUSTOMERS_MIGRATION]: true };
+          changed = true;
         }
         if (changed) saveDb(db);
         return db;
@@ -28,21 +68,14 @@
       users: [
         { user_id: 1, username: 'admin', password: 'admin123', full_name: 'System Administrator', role: 'Administrator', status: 'Active' },
         { user_id: 2, username: 'staff_anna', password: 'staff123', full_name: 'Anna Reyes', role: 'Staff', status: 'Active' },
-        { user_id: 3, username: 'staff_mark', password: 'staff123', full_name: 'Mark Santos', role: 'Staff', status: 'Active' },
-        { user_id: 4, username: 'juan', password: 'customer123', full_name: 'Juan Dela Cruz', role: 'Customer', customer_id: 1, status: 'Active' },
-        { user_id: 5, username: 'maria', password: 'customer123', full_name: 'Maria Clara', role: 'Customer', customer_id: 2, status: 'Active' }
+        { user_id: 3, username: 'staff_mark', password: 'staff123', full_name: 'Mark Santos', role: 'Staff', status: 'Active' }
       ],
       customers: [
-        { customer_id: 1, customer_identity: 'CUST-0001', full_name: 'Juan Dela Cruz', phone: '09171234567', email: 'juan@gmail.com', address: '123 Main St, Manila' },
-        { customer_id: 2, customer_identity: 'CUST-0002', full_name: 'Maria Clara', phone: '09189876543', email: 'maria@gmail.com', address: '456 Sampaguita St, Quezon City' },
         { customer_id: 3, customer_identity: 'CUST-0003', full_name: 'Pedro Penduko', phone: '09195551234', email: 'pedro@gmail.com', address: '789 Mabini St, Makati' },
         { customer_id: 4, customer_identity: 'CUST-0004', full_name: 'Ana Santos', phone: '09181234501', email: 'ana.santos@gmail.com', address: '12 Rizal Ave, Pasig' },
         { customer_id: 5, customer_identity: 'CUST-0005', full_name: 'Carlo Mendoza', phone: '09181234502', email: 'carlo.mendoza@gmail.com', address: '25 Luna St, Taguig' }
       ],
       pets: [
-        { pet_id: 1, pet_code: 'P9AB2', customer_id: 1, name: 'Buddy', species: 'Dog', breed: 'Golden Retriever', age: 3 },
-        { pet_id: 2, pet_code: 'PK4M8', customer_id: 1, name: 'Milo', species: 'Cat', breed: 'Siamese', age: 2 },
-        { pet_id: 3, pet_code: 'P7TX1', customer_id: 2, name: 'Bella', species: 'Dog', breed: 'Poodle', age: 4 },
         { pet_id: 4, pet_code: 'PW3Z9', customer_id: 3, name: 'Luna', species: 'Cat', breed: 'Persian', age: 1 }
       ],
       products: [
@@ -54,19 +87,13 @@
         { product_id: 6, name: 'Cat Scratching Post', category: 'Accessories', price: 850, stock_quantity: 6, reorder_level: 2, barcode: 'PET100006' },
         { product_id: 7, name: 'De-shedding Pet Brush', category: 'Grooming', price: 220, stock_quantity: 8, reorder_level: 3, barcode: 'PET100007' }
       ],
-      appointments: [
-        { appointment_id: 1, pet_id: 1, service: 'Full Grooming Package', appointment_date: '2026-11-20 10:00', price: 850, status: 'Scheduled' },
-        { appointment_id: 2, pet_id: 3, service: 'Basic Shower & Blow Dry', appointment_date: '2026-11-20 11:30', price: 450, status: 'Scheduled' },
-        { appointment_id: 3, pet_id: 2, service: 'Anti-Flea & Tick Treatment', appointment_date: '2026-11-20 14:00', price: 350, status: 'Scheduled' }
-      ],
-      pickups: [
-        { pickup_id: 1, pet_id: 1, person_name: 'Clara Dela Cruz', relationship: 'Authorized representative', contact: '09170001122', id_presented: 1, authorization_status: 'Verified', released_at: '2026-11-06 12:00:00' },
-        { pickup_id: 2, pet_id: 3, person_name: 'Jose Clara', relationship: 'Authorized representative', contact: '09181112233', id_presented: 1, authorization_status: 'Pending', released_at: null }
-      ],
+      appointments: [],
+      pickups: [],
       sales: [
-        { sale_id: 1, customer_id: 1, user_id: 2, sale_date: '2026-11-05 09:15:00', total_amount: 650, sold_products: 'Premium Adult Dog Food (5kg)', customer: 'Juan Dela Cruz', customer_phone: '09171234567', customer_pets: 'Buddy, Milo', cashier: 'Anna Reyes', method: 'Cash', reference_number: null }
+        { sale_id: 1, customer_id: null, user_id: 2, sale_date: '2026-11-05 09:15:00', total_amount: 650, sold_products: 'Premium Adult Dog Food (5kg)', customer: 'Walk-in', customer_phone: '', customer_pets: '', cashier: 'Anna Reyes', method: 'Cash', reference_number: null }
       ],
       backups: ['backup-initial-seed.db'],
+      migrations: { [REMOVED_DEMO_CUSTOMERS_MIGRATION]: true },
       logs: [
         `${new Date().toISOString()} System initialized on GitHub Pages deployment`,
         `${new Date().toISOString()} Sample database records loaded`
@@ -82,12 +109,13 @@
 
   function getUserFromToken(token) {
     if (!token) return null;
+    const db = initDb();
     try {
       const parsed = JSON.parse(atob(token.split('.')[1] || ''));
-      return parsed;
+      const account = db.users.find(u => String(u.user_id) === String(parsed.id));
+      return account?.status === 'Active' ? parsed : null;
     } catch (e) {
-      const db = initDb();
-      return db.users.find(u => String(u.user_id) === String(token)) || null;
+      return db.users.find(u => String(u.user_id) === String(token) && u.status === 'Active') || null;
     }
   }
 
@@ -139,7 +167,7 @@
     // Auth Login
     if (cleanPath === '/auth/login' && method === 'POST') {
       const u = db.users.find(x => x.username.toLowerCase() === String(body.username || '').toLowerCase());
-      if (!u || u.password !== body.password) {
+      if (!u || u.status !== 'Active' || u.password !== body.password) {
         addLog(db, `Failed login for "${body.username}" (client mode)`);
         saveDb(db);
         throw new Error('Wrong username or password');
@@ -221,10 +249,10 @@
         cust = db.customers.find(c => c.full_name.toLowerCase() === String(body.full_name || '').trim().toLowerCase() && c.phone === String(body.phone || '').trim());
       }
       if (!cust) {
-        const nextId = db.customers.length + 1;
+        const nextCustomerId = nextId(db.customers, 'customer_id');
         cust = {
-          customer_id: nextId,
-          customer_identity: `CUST-${String(nextId).padStart(4, '0')}`,
+          customer_id: nextCustomerId,
+          customer_identity: `CUST-${String(nextCustomerId).padStart(4, '0')}`,
           full_name: String(body.full_name || '').trim(),
           phone: String(body.phone || '').trim(),
           email: String(body.email || '').trim(),
@@ -237,7 +265,7 @@
         const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         const code = `P${Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('')}`;
         pet = {
-          pet_id: db.pets.length + 1,
+          pet_id: nextId(db.pets, 'pet_id'),
           pet_code: code,
           customer_id: cust.customer_id,
           name: String(body.pet_name || '').trim(),
@@ -253,7 +281,7 @@
         'Teeth Brushing & Breath Care': 120, 'Puppy / Kitten First Bath': 300
       };
       const newAppt = {
-        appointment_id: db.appointments.length + 1,
+        appointment_id: nextId(db.appointments, 'appointment_id'),
         pet_id: pet.pet_id,
         service: body.service,
         appointment_date: appointmentDate,
@@ -330,7 +358,7 @@
         }).reverse();
       }
       if (method === 'POST') {
-        const id = db.appointments.length + 1;
+        const id = nextId(db.appointments, 'appointment_id');
         const appt = { appointment_id: id, ...body, status: 'Scheduled' };
         db.appointments.push(appt);
         saveDb(db);
@@ -358,7 +386,7 @@
         if (db.users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
           throw new Error('Username is already taken');
         }
-        const id = db.users.length + 1;
+        const id = nextId(db.users, 'user_id');
         const newUser = {
           user_id: id,
           username,
@@ -452,12 +480,23 @@
         })).reverse();
       }
       if (method === 'POST') {
-        const id = db.customers.length + 1;
+        const id = nextId(db.customers, 'customer_id');
         const c = { customer_id: id, customer_identity: `CUST-${String(id).padStart(4, '0')}`, ...body };
         db.customers.push(c);
         saveDb(db);
         return c;
       }
+    }
+
+    if (/^\/customers\/\d+$/.test(cleanPath) && method === 'DELETE') {
+      if (currentUser?.role !== 'Administrator') throw new Error('Administrator access required');
+      const id = Number(cleanPath.split('/')[2]);
+      if (!db.customers.some(c => Number(c.customer_id) === id)) throw new Error('Customer not found');
+      removeCustomerRecords(db, [id]);
+      db.users = db.users.map(u => Number(u.customer_id) === id ? { ...u, customer_id: null, status: 'Inactive' } : u);
+      addLog(db, `Deleted customer #${id} and deactivated linked customer accounts`);
+      saveDb(db);
+      return { ok: true };
     }
 
     // Pets list / add
@@ -476,7 +515,7 @@
       if (method === 'POST') {
         const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         const code = `P${Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('')}`;
-        const p = { pet_id: db.pets.length + 1, pet_code: code, ...body };
+        const p = { pet_id: nextId(db.pets, 'pet_id'), pet_code: code, ...body };
         db.pets.push(p);
         saveDb(db);
         return p;
