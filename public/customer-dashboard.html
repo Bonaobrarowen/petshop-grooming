@@ -13,6 +13,7 @@
     header .user-info{display:flex;align-items:center;gap:14px;font-size:14px}
     header .user-info a{color:var(--muted);text-decoration:none}
     header .user-info a:hover{color:var(--accent)}
+    header .user-info .current-portal{color:var(--accent);font-weight:600}
     button{border:0;border-radius:6px;background:var(--accent);color:white;padding:9px 16px;font:inherit;font-weight:600;cursor:pointer}
     button:hover{opacity:0.92}
     .wrap{max-width:960px;margin:auto;padding:24px}
@@ -50,8 +51,61 @@
 <script src="api-client.js"></script>
 <script>
 let token=localStorage.getItem('tok'),user=JSON.parse(localStorage.getItem('me')||'null');
+let availabilityRequest=0;
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function minimumAppointmentDate(){
+  const minimum=new Date(Math.ceil((Date.now()+4*60*60*1000)/60000)*60000);
+  if(minimum.getHours()>=1&&minimum.getHours()<8)minimum.setHours(8,0,0,0);
+  return minimum;
+}
+
+function localDateTimeValue(date){
+  const pad=value=>String(value).padStart(2,'0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+async function updateAvailability(dateInput,feedback){
+  const request=++availabilityRequest;
+  dateInput.setCustomValidity('');
+  feedback.className='full';
+  feedback.textContent='';
+  if(!dateInput.value)return true;
+
+  const appointment=new Date(dateInput.value);
+  if(Number.isNaN(appointment.getTime())||appointment.getTime()<Date.now()+4*60*60*1000){
+    feedback.className='full error';
+    feedback.textContent='Appointments must be booked at least 4 hours in advance.';
+    dateInput.setCustomValidity(feedback.textContent);
+    return false;
+  }
+  if(appointment.getHours()>=1&&appointment.getHours()<8){
+    feedback.className='full error';
+    feedback.textContent='Appointments are available from 8:00 AM until 1:00 AM.';
+    dateInput.setCustomValidity(feedback.textContent);
+    return false;
+  }
+
+  try{
+    const availability=await api(`/public/availability?date=${encodeURIComponent(dateInput.value.slice(0,10))}`);
+    if(request!==availabilityRequest)return false;
+    if(!availability.available){
+      feedback.className='full error';
+      feedback.textContent='This day is fully booked. Please choose another date.';
+      dateInput.setCustomValidity(feedback.textContent);
+      return false;
+    }
+    feedback.textContent=`${availability.remaining} appointment slot(s) remain for this day.`;
+    return true;
+  }catch(err){
+    if(request!==availabilityRequest)return false;
+    feedback.className='full error';
+    feedback.textContent=err.message;
+    dateInput.setCustomValidity(err.message);
+    return false;
+  }
+}
 
 async function api(path,method='GET',body){
   try{
@@ -153,7 +207,7 @@ async function renderPortal(){
       <b>Pet Shop Grooming</b>
       <div class="user-info">
         <span>👤 Welcome, <strong id="user-display">${esc(user.name||'Customer')}</strong></span>
-        <a href="index.html">Staff portal</a>
+        <a href="customer-dashboard.html" class="current-portal">Customer Portal</a>
         <button id="logout-btn" style="padding:6px 12px;font-size:13px">Sign out</button>
       </div>
     </header>
@@ -194,6 +248,7 @@ async function renderPortal(){
           <label class="full">Preferred date and time
             <input name="appointment_date" type="datetime-local" required>
           </label>
+          <div class="full" id="availability-feedback" aria-live="polite"></div>
           <input type="hidden" name="email" autocomplete="email">
           <input type="hidden" name="address" autocomplete="street-address">
           <button class="full" style="padding:12px;font-size:16px;margin-top:8px">Submit Grooming Appointment</button>
@@ -206,10 +261,12 @@ async function renderPortal(){
   $('#logout-btn').onclick=logout;
 
   const dateInput=$('[name=appointment_date]');
-  const minDate=new Date(Date.now()+30*60*1000);
-  minDate.setSeconds(0,0);
-  dateInput.min=new Date(minDate-minDate.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  const minDate=minimumAppointmentDate();
+  dateInput.min=localDateTimeValue(minDate);
   dateInput.value=dateInput.min;
+  const availabilityFeedback=$('#availability-feedback');
+  dateInput.addEventListener('change',()=>updateAvailability(dateInput,availabilityFeedback));
+  await updateAvailability(dateInput,availabilityFeedback);
 
   await loadCustomerData();
 
@@ -241,6 +298,7 @@ async function loadCustomerData(){
     const profile=await api('/customer/profile');
     const form=$('#booking-form');
     if(profile&&form){
+      if(profile.full_name)$('#user-display').textContent=profile.full_name;
       if(profile.full_name)form.elements.full_name.value=profile.full_name;
       if(profile.phone)form.elements.phone.value=profile.phone;
       if(profile.email)form.elements.email.value=profile.email;

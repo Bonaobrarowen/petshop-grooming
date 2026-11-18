@@ -100,6 +100,38 @@
     if (db.logs.length > 100) db.logs.pop();
   }
 
+  function getClientDailyAvailability(date, appointments) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Choose a valid appointment date');
+    const [year, month, day] = date.split('-').map(Number);
+    const dateCheck = new Date(year, month - 1, day);
+    if (dateCheck.getFullYear() !== year || dateCheck.getMonth() !== month - 1 || dateCheck.getDate() !== day) {
+      throw new Error('Choose a valid appointment date');
+    }
+
+    const booked = appointments.filter(a => String(a.appointment_date || '').slice(0, 10) === date).length;
+    return { date, capacity: 3, booked, remaining: Math.max(0, 3 - booked), available: booked < 3 };
+  }
+
+  function validateClientAppointmentTime(value, appointments) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+    const appointment = new Date(value);
+    if (!match || Number.isNaN(appointment.getTime())) throw new Error('Choose a valid appointment date and time');
+    const [, yearText, monthText, dayText, hourText, minuteText] = match;
+    const year = Number(yearText), month = Number(monthText), day = Number(dayText);
+    const hour = Number(hourText), minute = Number(minuteText);
+    if (appointment.getFullYear() !== year || appointment.getMonth() !== month - 1 ||
+        appointment.getDate() !== day || appointment.getHours() !== hour ||
+        appointment.getMinutes() !== minute) throw new Error('Choose a valid appointment date and time');
+    if (appointment.getTime() < Date.now() + 4 * 60 * 60 * 1000) {
+      throw new Error('Appointments must be booked at least 4 hours in advance');
+    }
+    if (hour >= 1 && hour < 8) throw new Error('Appointments are available from 8:00 AM until 1:00 AM');
+
+    const dailyAvailability = getClientDailyAvailability(value.slice(0, 10), appointments);
+    if (!dailyAvailability.available) throw new Error('This day is fully booked. Please choose another date.');
+    return value.replace('T', ' ').slice(0, 16);
+  }
+
   async function clientDb(path, method, body, token) {
     const db = initDb();
     const currentUser = getUserFromToken(token);
@@ -162,6 +194,11 @@
       return cust;
     }
 
+    if (cleanPath === '/public/availability' && method === 'GET') {
+      const query = new URLSearchParams(path.split('?')[1] || '');
+      return getClientDailyAvailability(query.get('date') || '', db.appointments);
+    }
+
     // Customer Appointments
     if (cleanPath === '/customer/appointments' && method === 'GET') {
       if (!currentUser) throw new Error('Please log in');
@@ -178,6 +215,7 @@
 
     // Customer / Public Book Appointment
     if ((cleanPath === '/customer/appointments' || cleanPath === '/public/appointments') && method === 'POST') {
+      const appointmentDate = validateClientAppointmentTime(String(body.appointment_date || '').trim(), db.appointments);
       let cust = currentUser?.customer_id ? db.customers.find(c => c.customer_id === currentUser.customer_id) : null;
       if (!cust) {
         cust = db.customers.find(c => c.full_name.toLowerCase() === String(body.full_name || '').trim().toLowerCase() && c.phone === String(body.phone || '').trim());
@@ -209,7 +247,6 @@
         };
         db.pets.push(pet);
       }
-      const rawDate = String(body.appointment_date || '').replace('T', ' ').slice(0, 16);
       const apptPrices = {
         'Full Grooming Package': 850, 'Basic Shower & Blow Dry': 450, 'Nail Trimming & Filing': 150,
         'Ear Cleaning & Plucking': 150, 'Anti-Flea & Tick Treatment': 350, 'De-Shedding & De-Matting': 300,
@@ -219,7 +256,7 @@
         appointment_id: db.appointments.length + 1,
         pet_id: pet.pet_id,
         service: body.service,
-        appointment_date: rawDate,
+        appointment_date: appointmentDate,
         price: apptPrices[body.service] || 850,
         status: 'Pending'
       };

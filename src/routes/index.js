@@ -9,6 +9,7 @@ const appointments = require('../controllers/appointmentController');
 
 r.post('/auth/login', require('../controllers/authController').login);
 r.post('/auth/signup', require('../controllers/authController').signup);
+r.get('/public/availability', require('../controllers/publicBookingController').availability);
 r.post('/public/appointments', require('../controllers/publicBookingController').create);
 r.use(auth);
 r.get('/customer/profile', require('../controllers/customerDashboardController').profile);

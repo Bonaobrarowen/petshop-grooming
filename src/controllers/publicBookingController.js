@@ -3,6 +3,7 @@ const { db } = require('../../config/database');
 const { bad } = require('../middleware/auth');
 const app = require('../../config/app_config');
 const cfg = require('../../config/auth');
+const availability = require('../services/appointmentAvailability');
 
 const prices = {
   'Full Grooming Package': 850,
@@ -23,15 +24,12 @@ exports.create = (q, s) => {
   const age = Number(q.body.age);
   const service = String(q.body.service || '').trim();
   const rawDate = String(q.body.appointment_date || '').trim();
-  const appointmentDate = new Date(rawDate);
 
   if (!fullName || !phone || !petName || !service) throw bad('Complete all required fields');
   if (!/^09\d{9}$/.test(phone)) throw bad('Enter a valid 11-digit Philippine mobile number');
   if (!prices[service]) throw bad('Select a valid grooming service');
   if (!Number.isFinite(age) || age < 0) throw bad('Enter a valid dog age');
-  if (!rawDate || Number.isNaN(appointmentDate.getTime()) || appointmentDate.getTime() <= Date.now()) {
-    throw bad('Appointment date and time cannot be in the past');
-  }
+  const appointment = availability.validateAppointmentTime(rawDate);
 
   // Format local date representation YYYY-MM-DD HH:mm without UTC skew
   const formattedDate = rawDate.replace('T', ' ').slice(0, 16);
@@ -46,6 +44,9 @@ exports.create = (q, s) => {
   }
 
   const booking = db.transaction(() => {
+    const dailyAvailability = availability.getDailyAvailability(appointment.date);
+    if (!dailyAvailability.available) throw bad('This day is fully booked. Please choose another date.');
+
     let customer = null;
     if (userId) {
       const userAcc = db.prepare('SELECT customer_id FROM user_account WHERE user_id=?').get(userId);
@@ -116,4 +117,8 @@ exports.create = (q, s) => {
     ...res,
     message: 'Appointment request submitted. Waiting for staff to register your schedule in the system.'
   });
+};
+
+exports.availability = (q, s) => {
+  s.json(availability.getDailyAvailability(String(q.query.date || '')));
 };

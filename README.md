@@ -65,6 +65,8 @@ The local Node server stores records in `database/petshop.db`. GitHub Pages runs
 
 Open the site at `https://bonaobrarowen.github.io/petshop-grooming/`. Customer signup and appointment booking work in the demo and are saved only in the current browser. They are not shared with staff on another device or browser. Use `npm start` and the local Node server when you need records stored in a shared database on that computer.
 
+Online appointments require at least 4 hours' notice, must start from 8:00 AM until 1:00 AM the following day, and are limited to 3 appointments per calendar day. A full day cannot accept additional bookings.
+
 ---
 
 ## Default Login Credentials

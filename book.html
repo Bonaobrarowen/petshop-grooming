@@ -48,7 +48,57 @@
 <script src="api-client.js"></script>
 <script>
 const form=document.querySelector('#booking'),message=document.querySelector('#message'),date=form.elements.appointment_date;
-const minimum=new Date(Date.now()+30*60*1000);minimum.setSeconds(0,0);date.min=new Date(minimum-minimum.getTimezoneOffset()*60000).toISOString().slice(0,16);
+let availabilityRequest=0;
+function minimumAppointmentDate(){
+  const minimum=new Date(Math.ceil((Date.now()+4*60*60*1000)/60000)*60000);
+  if(minimum.getHours()>=1&&minimum.getHours()<8)minimum.setHours(8,0,0,0);
+  return minimum;
+}
+function localDateTimeValue(value){
+  const pad=part=>String(part).padStart(2,'0');
+  return `${value.getFullYear()}-${pad(value.getMonth()+1)}-${pad(value.getDate())}T${pad(value.getHours())}:${pad(value.getMinutes())}`;
+}
+async function updateAvailability(){
+  const request=++availabilityRequest;
+  date.setCustomValidity('');
+  message.className='';
+  message.textContent='';
+  if(!date.value)return true;
+  const appointment=new Date(date.value);
+  if(Number.isNaN(appointment.getTime())||appointment.getTime()<Date.now()+4*60*60*1000){
+    message.className='error';
+    message.textContent='Appointments must be booked at least 4 hours in advance.';
+    date.setCustomValidity(message.textContent);
+    return false;
+  }
+  if(appointment.getHours()>=1&&appointment.getHours()<8){
+    message.className='error';
+    message.textContent='Appointments are available from 8:00 AM until 1:00 AM.';
+    date.setCustomValidity(message.textContent);
+    return false;
+  }
+  try{
+    const availability=await window.petshopApi(`/public/availability?date=${encodeURIComponent(date.value.slice(0,10))}`);
+    if(request!==availabilityRequest)return false;
+    if(!availability.available){
+      message.className='error';
+      message.textContent='This day is fully booked. Please choose another date.';
+      date.setCustomValidity(message.textContent);
+      return false;
+    }
+    message.textContent=`${availability.remaining} appointment slot(s) remain for this day.`;
+    return true;
+  }catch(error){
+    if(request!==availabilityRequest)return false;
+    message.className='error';
+    message.textContent=error.message;
+    date.setCustomValidity(error.message);
+    return false;
+  }
+}
+const minimum=minimumAppointmentDate();
+date.min=localDateTimeValue(minimum);
+date.addEventListener('change',updateAvailability);
 form.onsubmit=async event=>{
   event.preventDefault();message.className='';message.textContent='Submitting...';
   try{
