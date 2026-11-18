@@ -445,6 +445,18 @@
         return newProduct;
       }
     }
+    if (/^\/products\/\d+\/restock$/.test(cleanPath) && method === 'POST') {
+      if (!['Staff', 'Administrator'].includes(currentUser?.role)) throw new Error('Staff access required');
+      const id = Number(cleanPath.split('/')[2]);
+      const quantity = Number(body.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1) throw new Error('Quantity to add must be a positive whole number');
+      const product = db.products.find(p => Number(p.product_id) === id);
+      if (!product) throw new Error('Product not found');
+      product.stock_quantity = Number(product.stock_quantity) + quantity;
+      addLog(db, `Restocked ${product.name} by ${quantity} units`);
+      saveDb(db);
+      return product;
+    }
     if (/^\/products\/\d+$/.test(cleanPath)) {
       const id = Number(cleanPath.split('/')[2]);
       if (method === 'PUT') {
